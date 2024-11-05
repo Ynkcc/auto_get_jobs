@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from aiconfig import ai_response
+from aiconfig import ai_response, ai_hr
 import os
 import time
 import json
@@ -102,54 +102,87 @@ def get_job_info():
         next_page_button.click()     
     return jobs
 
-def chicke_job(my_job_name, my_job_salary):
+def active_hr(boss_url, my_job_name, my_job_salary):
+    """
+    获取活跃的HR,HR活跃开始分析工作
+    """
+    active_hr_jobs = []
+    #获取工作列表
+    jobs = get_job_info()
+    #获取单个工作详情页
+    for job in jobs:
+        job_link = job['job_link']
+        job_detail = boss_url + job_link
+        wb.get(job_detail)
+        WebDriverWait(wb, 60).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "job-boss-info"))
+        )
+        #bs4解析页面hr活跃度
+        html_content = wb.page_source
+        soup = BeautifulSoup(html_content, "html.parser")
+        try:
+            hr_active_time = soup.find('span', class_='boss-active-time').text.strip()
+            if hr_active_time in ["本月活跃", "2月内活跃","3月内活跃", "4月内活跃", "5月内活跃", "半年前活跃"]:
+                print(f"HR不活跃，跳过当前岗位。活跃程度为：{hr_active_time}")
+                continue
+            #HR在线率搞获取岗位名称开始对比
+            job_name = job['job_name']
+            job_salary = job['job_salary']
+            if check_position_match(job_name, job_salary, my_job_name, my_job_salary):
+                check_job_match(soup)
+            
+            
+            
+            active_hr_jobs.append(job)
+            time.sleep(5)
+        except:
+            print(f"解析失败，跳过当前岗位。")
+            time.sleep(5)
+            continue
+    print(f"当前有效岗位数量为：{len(active_hr_jobs)}")
+    return active_hr_jobs
+
+
+def check_position_match(job_name, job_salary, my_job_name, my_job_salary):
     """
     检索岗位是否匹配
     """
-    useful_jobs = []
-    jobs = get_job_info()
-    for job in jobs:
-        job_name = job['job_name']
-        job_salary = job['job_salary']
-        
-        url='https://api.siliconflow.cn/v1/chat/completions'
-        key=''
-        model='Vendor-A/Qwen/Qwen2.5-72B-Instruct'
-        content=f'你是一个经验丰富的HR，你的任务是判断当前招聘岗位和薪资水平是否和我所期望的岗位匹配，如果匹配输出true，不匹配则输出false，除了true和false不要输出任何多余的内容，不要对基本信息讨论。以下是基本信息：当前招聘的岗位为“{job_name}”，招聘的岗位薪资为“{job_salary}k”，我所期望的岗位为“{my_job_name}”，最低薪资为“{my_job_salary}k”。'
-        ai_res = ai_response(url, key ,model ,content)
-        print(f"招聘岗位:==={job_name}===,期望岗位：==={my_job_name}===,AI判断结果：{ai_res}")
-        if ai_res.lower() == "true":
-            useful_jobs.append(job)
-    return useful_jobs
-
-def hr_activity():
-    """
-    检测hr活跃度
-    """
-    html_content = wb.page_source
-    suop = BeautifulSoup(html_content, "html.parser")
-    hr_active_time = suop.find('span', class_='boss-active-time')
-    if hr_active_time in ["本月活跃", "2月内活跃","3月内活跃", "4月内活跃", "5月内活跃", "半年活跃"]:
-        return False
-    else:
-        job_sec = suop.find('div', class_='job-sec-text').text.strip()
-        url='https://api.siliconflow.cn/v1/chat/completions'
-        key=''
-        model='Vendor-A/Qwen/Qwen2.5-72B-Instruct'
-        content=''
+    url = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
+    key =   # 替换为您的实际API密钥
+    model = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
+    content=f'你是一个经验丰富的HR，你的任务是判断当前招聘岗位和薪资水平是否和我所期望的岗位匹配，如果匹配输出true，不匹配则输出false，除了true和false不要输出任何多余的内容，不要对基本信息讨论。以下是基本信息：当前招聘的岗位为“{job_name}”，招聘的岗位薪资为“{job_salary}k”，我所期望的岗位为“{my_job_name}”，最低薪资为“{my_job_salary}k”。'
+    ai_res = ai_response(url, key ,model ,content)
+    print(f"招聘岗位:==={job_name}===,期望岗位：==={my_job_name}===,AI判断结果：{ai_res}")
+    if ai_res.lower() == "true":
         return True
+
+def check_job_match(soup):
+    """
+    检测岗位内容是否匹配
+    """
+    user_requirements = get_user_requirements()
+    job_requirements = soup.find('div', class_='job-sec-text').text.strip()
+    url = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
+    key =   # 替换为您的实际API密钥
+    model = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
+    first_response = ai_hr(url, key, model, job_requirements, user_requirements)
+    final_analysis = ai_hr(url, key, model, job_requirements, user_requirements, first_response, data_analysis=True)
+    print(f"初步分析结果:{first_response}")
+    print(f"最终分析结果:{final_analysis}")
+    return
+
+def get_user_requirements():
+    """
+    获取用户简历
+    """
+    file_path = os.path.join("user_requirements.txt")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError("用户简历文件不存在，请先创建。")
+    with open(file_path, "r", encoding="utf-8") as f:
+        user_requirements = f.read().strip()
+        # print(user_requirements)
+    return user_requirements
     
-
-def view_job_details():
-    url = "https://www.zhipin.com"
-    useful_jobs = chicke_job(my_job_name, my_job_salary)
-    for job in useful_jobs:
-        job_link = job['job_link']
-        wb.get(f'https://www.zhipin.com{job_link}')
-        time.sleep(60)
-
-
-
 
 if __name__ == "__main__":
     query = "运维"
@@ -158,6 +191,7 @@ if __name__ == "__main__":
     # search(query, city,degree)
     my_job_name = "运维"
     my_job_salary = 5
+    boss_url = "https://www.zhipin.com"
     search(query, city, degree = None)
-    view_job_details()
+    active_hr(boss_url, my_job_name, my_job_salary)
     wb.quit()
