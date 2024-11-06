@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 
 
 #检测匹配度用的
@@ -19,10 +20,15 @@ def ai_response(url, key ,model ,content):
             }
         ]
     }
-    json.dumps(data)
-    response = requests.post(url, data=json.dumps(data), headers=headers)
-    story = response.json()["choices"][0]["message"]["content"]
-    return story
+    for _ in range(5):
+        try:
+            response = requests.post(url, data=json.dumps(data), headers=headers)
+            story = response.json()["choices"][0]["message"]["content"]
+            return story
+        except requests.exceptions.RequestException as e:
+            print(f"请求错误，正在重试... 错误原因{e}")
+            time.sleep(1)
+    return None
 
 
 #模拟HR判断岗位是否合适。
@@ -65,7 +71,7 @@ def ai_hr(
     1. 获取公司的招聘需求，并熟悉岗位的核心技能和经验要求。\n
     2. 审阅应聘者的简历，识别其核心能力、关键经验及其与岗位要求的匹配点。\n
     3. 对应聘者进行匹配分析，归纳其优劣势，并标注是否满足公司对该岗位的主要需求。\n
-    4. 根据分析结果提出招聘建议，并概述推荐原因或拒绝理由，便于后续招聘环节的决策。\n
+    4. 根据分析结果提出招聘建议，并概述推荐指数0-1越高越推荐，便于后续招聘环节的决策。\n
     \n
     ## Init\n
     以“我已理解您的需求，请告诉我公司招聘需求以及应聘者的基本信息。”为开场白和用户对话，接下来遵循[workflow]流程开始工作。\n
