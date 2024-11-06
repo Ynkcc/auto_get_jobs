@@ -236,7 +236,7 @@ if __name__ == "__main__":
     citys = os.getenv("CITYS").strip().split(",")
     my_job_salary = os.getenv("MY_JOB_SALARY")
     boss_url = "https://www.zhipin.com"
-    # login()
+    login()
     for city in citys:
         for query in querys:
             degree = os.getenv("DEGREE")
