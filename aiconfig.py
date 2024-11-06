@@ -1,16 +1,23 @@
 import requests
 import json
 import time
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
+
+URL = os.getenv("API_URL").strip()
+KEY = os.getenv("API_KEY").strip()
+MODEL = os.getenv("MODEL").strip()
 
 #检测匹配度用的
-def ai_response(url, key ,model ,content):
+def ai_response(content):
     headers = {
-        "Authorization": f"Bearer {key}",
+        "Authorization": f"Bearer {KEY}",
         "Content-Type": "application/json"
     }
     data = {
-        'model': model,
+        'model': MODEL,
         'temperature': 0.2,
         'max_tokens': 100,
         'messages': [
@@ -22,7 +29,7 @@ def ai_response(url, key ,model ,content):
     }
     for _ in range(5):
         try:
-            response = requests.post(url, data=json.dumps(data), headers=headers)
+            response = requests.post(URL, data=json.dumps(data), headers=headers)
             story = response.json()["choices"][0]["message"]["content"]
             return story
         except requests.exceptions.RequestException as e:
@@ -33,9 +40,6 @@ def ai_response(url, key ,model ,content):
 
 #模拟HR判断岗位是否合适。
 def ai_hr(
-    url,
-    key, 
-    model, 
     job_requirements, 
     user_requirements, 
     first_response = None, 
@@ -62,7 +66,7 @@ def ai_hr(
     4. 有效沟通能力，能提供关于匹配结果的清晰判断依据。\n
     \n
     ## Rules\n
-    1. 充分阅读并理解公司提供的招聘需求，包括职位职责、所需技能、经验要求及软性条件。\n
+    1. 充分阅读并理解公司提供的招聘需求，包括工作经验、职位职责、所需技能、经验要求及软性条件。\n
     2. 仔细审阅应聘者的简历，重点关注其技能、工作经历、成就以及其他与职位要求相关的特质。\n
     3. 如果应聘者的背景与岗位要求存在显著差异，应以清晰的理由进行说明。\n
     4. 根据匹配度对候选人进行分类，提供推荐等级，并提供简洁的理由。\n
@@ -70,7 +74,7 @@ def ai_hr(
     ## Workflows\n
     1. 获取公司的招聘需求，并熟悉岗位的核心技能和经验要求。\n
     2. 审阅应聘者的简历，识别其核心能力、关键经验及其与岗位要求的匹配点。\n
-    3. 对应聘者进行匹配分析，归纳其优劣势，并标注是否满足公司对该岗位的主要需求。\n
+    3. 对应聘者进行匹配分析，归纳其优劣势，并标注是否满足公司对该岗位的主要需求，如果工作经验不满足直接不推荐。\n
     4. 根据分析结果提出招聘建议，并概述推荐指数0-1越高越推荐，便于后续招聘环节的决策。\n
     \n
     ## Init\n
@@ -80,7 +84,7 @@ def ai_hr(
     
     
     headers = {
-        "Authorization": f"Bearer {key}",
+        "Authorization": f"Bearer {KEY}",
         "Content-Type": "application/json"
     }
     
@@ -119,23 +123,26 @@ def ai_hr(
             "content": "结合以上信息和分析结果，精准判断应聘者是否与岗位匹配，如果匹配则返回“true”，不匹配则返回“false”，不要对以上内容进行讨论和输出任何多余内容，只输出true或false即可。"  
         })
     data = {
-        'model': model,
+        'model': MODEL,
         'temperature': 0.2,
         'max_tokens': 1024,
         'messages': messages
     }
-    
-    response = requests.post(url, data=json.dumps(data), headers=headers)
-    story = response.json()["choices"][0]["message"]["content"]
-    
-    return story
+    try:
+        response = requests.post(URL, data=json.dumps(data), headers=headers)
+        story = response.json()["choices"][0]["message"]["content"]
+        return story
+    except requests.exceptions.RequestException as e:
+        print(f"Error: {e}")
+        
+    return None
 
 
 if __name__ == "__main__":
     # 示例调用
-    url = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
-    key = "" # 替换为您的实际API密钥
-    model = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
+    URL = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
+    KEY = "" # 替换为您的实际API密钥
+    MODEL = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
 
     job_requirements = """
     岗位名称：Python开发工程师
@@ -172,10 +179,10 @@ if __name__ == "__main__":
     """
 
     # 初步分析
-    first_response = ai_hr(url, key, model, job_requirements, user_requirements)
+    first_response = ai_hr(job_requirements, user_requirements)
     print("初步分析结果:", first_response)
 
     # # 最终分析
-    final_analysis = ai_hr(url, key, model, job_requirements, user_requirements, first_response, data_analysis=True)
+    final_analysis = ai_hr(job_requirements, user_requirements, first_response, data_analysis=True)
     print("最终分析结果:", final_analysis)
     

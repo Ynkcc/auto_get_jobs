@@ -5,6 +5,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from aiconfig import ai_response, ai_hr
+from dotenv import load_dotenv
 import os
 import random
 import time
@@ -28,7 +29,8 @@ def login():
     try:
         print(f"等待登陆...")
         WebDriverWait(wb, 60).until(
-            EC.url_to_be(("https://www.zhipin.com/web/geek/job-recommend"))
+            EC.url_to_be(("https://www.zhipin.com/web/geek/job-recommend")) or
+            EC.url_to_be(("https://www.zhipin.com"))
         )
         print(f"登陆成功，自动跳转到主页。")
     except Exception as e:
@@ -96,44 +98,51 @@ def get_job_info():
                 'job_salary': job_salary,
                 'job_link': job_link
             })
-            print(f"当前岗位数量：{len(jobs)}")
+            # print(f"当前岗位数量：{len(jobs)}")
             
-        #下一页按钮的位置
-        next_page_button = wb.find_element(By.CLASS_NAME, "ui-icon-arrow-right")
-        print("开始采集下一页")
-        if "disabled" in next_page_button.find_element(By.XPATH, "..").get_attribute("class"):
-            print("没有下一页了，退出循环。")
-            break
-        wb.execute_script("arguments[0].click();", next_page_button)    
+        # 下一页按钮的位置
+        try:
+            next_page_button = wb.find_element(By.CLASS_NAME, "ui-icon-arrow-right")
+            print("开始采集下一页")
+            if "disabled" in next_page_button.find_element(By.XPATH, "..").get_attribute("class"):
+                print("没有下一页了，退出循环。")
+                break
+            wb.execute_script("arguments[0].click();", next_page_button)
+        except:
+            print("没有下一页按钮，退出循环。")
+            break    
     return jobs
 
 
 def check_position_match(query, my_job_salary):
     """
     检索岗位是否匹配
+    query: 岗位名称
+    my_job_salary: 我的期望薪资
     """
     jobs = get_job_info()
-    print(f"当前城市岗位数量为：{len(jobs)}")
+    print(f"根据当前数据，城市中总共有 {len(jobs)} 个岗位可供选择。")
     position_matchs = []
     for job in jobs:
         job_name = job['job_name']
         job_salary = job['job_salary']
-        url = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
-        key = 'sk-udsrdkzfkygtvvvniqtwypixidxafmawayqodsgvfgjpiqsv'  # 替换为您的实际API密钥
-        model = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
+
         content=f'你是一个经验丰富的HR，你的任务是判断当前招聘岗位和薪资水平是否和我所期望的岗位匹配，如果匹配输出true，不匹配则输出false，除了true和false不要输出任何多余的内容，不要对基本信息讨论。以下是基本信息：当前招聘的岗位为“{job_name}”，招聘的岗位薪资为“{job_salary}k”，我所期望的岗位为“{query}”，最低薪资为“{my_job_salary}k”。'
-        ai_res = ai_response(url, key ,model ,content)
-        print(f"招聘岗位:==={job_name}===,期望岗位：==={query}===,AI判断结果：{ai_res}")
+        ai_res = ai_response(content)
+        print(f"招聘岗位: {job_name}  |  期望岗位: {query}  |  AI判断结果: {ai_res}")
         if ai_res.lower() == "true":
             position_matchs.append(job)
             # print(position_matchs)
-    print(f"当前有效岗位数量为：{len(position_matchs)}")
+    print(f"根据当前数据，系统筛选出符合要求的岗位总数为: {len(position_matchs)} 个。")
     return position_matchs
 
 
 def active_hr(boss_url, query, my_job_salary):
     """
     获取活跃的HR,HR活跃开始分析工作
+    boss_url: 招聘平台链接
+    query: 岗位名称
+    my_job_salary: 我的期望薪资
     """
     # active_hr_jobs = []
     #获取工作列表
@@ -161,9 +170,7 @@ def active_hr(boss_url, query, my_job_salary):
                     chat_with_hr(soup)
                     print(f"HR活跃程度为：{hr_active_time},开始分析简历...")
                  #HR在线率搞获取岗位名称开始对比
-
-            
-
+                 
             # active_hr_jobs.append(job)
             # time.sleep(5)
         except:
@@ -179,13 +186,22 @@ def is_hr_online(soup):
     return False
 
 def chat_with_hr(soup):
-    chat_check = check_job_match(soup)
+    chat_check = check_job_match(soup).strip()
+    print(f"是否推荐:{chat_check}")
+    WebDriverWait(wb, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, ".btn.btn-startchat"))
+    )
     if chat_check.lower() == "true":
-        job_op_element = wb.find_element(By.CLASS_NAME, "job-op")
-        start_chat_button = job_op_element.find_element(By.CLASS_NAME, "btn btn-startchat")
-        print(start_chat_button)
-        if "立即沟通" in start_chat_button[0].text.strip():
-            start_chat_button.click()
+        startchat_button = wb.find_element(By.CSS_SELECTOR, ".btn.btn-startchat")
+        print(f"找到按钮: {startchat_button.text.strip()}")
+        if startchat_button.is_enabled() and startchat_button.is_displayed():
+            print("按钮可点击")
+            startchat_button = wb.find_element(By.CSS_SELECTOR, ".btn.btn-startchat")
+            wb.execute_script("arguments[0].scrollIntoView(true);", startchat_button)
+            startchat_button.click()
+            time.sleep(8)
+        else:
+            print("按钮不可点击")
     return
 
 def check_job_match(soup):
@@ -194,14 +210,10 @@ def check_job_match(soup):
     """
     user_requirements = get_user_requirements()
     job_requirements = soup.find('div', class_='job-sec-text').text.strip()
-    url = "https://api.siliconflow.cn/v1/chat/completions"  # OpenAI API的实际端点
-    key = 'sk-udsrdkzfkygtvvvniqtwypixidxafmawayqodsgvfgjpiqsv' # 替换为您的实际API密钥
-    model = "Vendor-A/Qwen/Qwen2.5-72B-Instruct"  # 使用的模型
-    first_response = ai_hr(url, key, model, job_requirements, user_requirements)
-    final_analysis = ai_hr(url, key, model, job_requirements, user_requirements, first_response, data_analysis=True)
+    first_response = ai_hr(job_requirements, user_requirements)
+    final_analysis = ai_hr(job_requirements, user_requirements, first_response, data_analysis=True)
     print(f"初步分析结果:{first_response}")
     print(f"-----------------------------------------------------------------------------")
-    print(f"最终分析结果:{final_analysis}")
     return final_analysis
 
 def get_user_requirements():
@@ -218,16 +230,15 @@ def get_user_requirements():
     
 
 if __name__ == "__main__":
-    querys = ['Linux运维','Linux驱动']
-    citys = ["杭州", "武汉"]
-    degree = None
-    # search(query, city,degree)
-    my_job_salary = 5
+    querys = os.getenv("QUERYS").strip().split(",")
+    citys = os.getenv("CITYS").strip().split(",")
+    my_job_salary = os.getenv("MY_JOB_SALARY")
     boss_url = "https://www.zhipin.com"
-    login()
+    # login()
     for city in citys:
         for query in querys:
-            search(query, city, degree = None)
+            degree = os.getenv("DEGREE")
+            search(query, city, degree)
             print(f"当前分析岗位：{query}，当前分析城市为：{city}")
             active_hr(boss_url, query, my_job_salary)
     wb.quit()
