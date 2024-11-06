@@ -59,6 +59,9 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+### 5. 登录BOSS直聘
+浏览器会自动打开BOSS直聘，登录即可（60秒内完成登录）。
+登录成功后，无需任何操作，等待即可 （可最小化运行）。
 
 ## 联系方式
 如有任何问题或建议，请联系项目维护者：
