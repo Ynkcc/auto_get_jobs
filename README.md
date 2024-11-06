@@ -17,6 +17,11 @@
 - **定时投稿**
 - **AI自动打招呼**
 
+## 注意事项
+- 如有能力，请自行确保Chrome浏览器和Chromedriver版本匹配，否则可能导致运行失败。
+- APIKEY的有效性和余额需要自行管理。
+- 仅供学习参考使用，请勿用于非正规用途。
+
 ## 使用准备
 
 ### 大模型APIKEY
@@ -79,11 +84,9 @@ nano user_requirements
 python main.py
 ```
 
-## 注意事项
-- 确保Chrome浏览器和Chromedriver版本匹配，否则可能导致运行失败。
-- APIKEY的有效性和余额需要自行管理。
-- 使用过程中请遵守BOSS直聘平台的相关规定，避免违规操作。
+
 
 ## 联系方式
 如有任何问题或建议，请联系项目维护者：
+- QQ: 1813317076
 - GitHub: [SanThousand](https://github.com/SanThousand)
