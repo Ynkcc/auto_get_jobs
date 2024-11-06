@@ -19,7 +19,7 @@
 - 如有能力，请自行确保Chrome浏览器和Chromedriver版本匹配，否则可能导致运行失败。
 - APIKEY的有效性和余额需要自行管理。
 - 仅供学习参考使用，请勿用于非正规用途。
-- 大模型开发交流群：![Alt text](00174A86.png): 487194990
+- 大模型开发交流群: [QQ群](https://qm.qq.com/q/oTCtCdWX8A)
 
 ## 使用准备
 
@@ -59,31 +59,6 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
-
-## 详细步骤
-
-### 安装依赖
-```bash
-pip install -r requirements.txt
-```
-
-### 配置环境变量
-创建并编辑`.env`文件：
-```bash
-nano .env
-```
-
-### 编辑user_requirements
-```bash
-nano user_requirements
-```
-
-### 启动项目
-```bash
-python main.py
-```
-
-
 
 ## 联系方式
 如有任何问题或建议，请联系项目维护者：
