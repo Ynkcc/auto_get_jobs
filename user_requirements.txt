@@ -1,25 +1,33 @@
-##专业技能：
-熟练使用CentOS、Ubuntu等Linux系统的常用命令；
-熟练Python，Shell脚本编写；
-熟练阿里云 ，腾讯云等主流云平台的，ECS、OSS、安全组配置及其他基础服务管理；
-熟悉Docker的容器化部署、编排和管理；
-熟悉Nginx配置；
-熟悉MySQL，了解OSS等服务的使用；
 
+## 个人信息
+- 学历：本科
+- 工作经验：1年
 
-##项目经验：
-项目名称:智慧气象
-在新乡气象局的智能气象服务系统项目中，我负责了AI气象服务系统的知识库构建、本地AI模型部署以及智能Agent开发。同时，我需要确保系统在高并发情况下稳定运行，并具备高效的扩展能力。
-1.用 Docker 容器化技术解决了环境不一致导致的部署问题，极大的缩短了项目的上线时间。
-2.使用Python预选处理数据，Embedding模型相似度匹配准确率提高了15%。
-3.利用 FastAPI 框架构建内容输入输出审查模块，处理速度提升 20%，保障数据安全
-4.配置Nginx设置负载均衡，结合Lets Encrypt实现自动化SSL证书管理，安全性和性能显著提高。
-5.开发智能 Agent 处理用户自然语言查询，提升用户查询的响应准确率达 99%。
+## 技能概述
+- 操作系统：熟练掌握Linux（CentOS、Ubuntu、RedHat、Debian等）系统管理
+- 编程语言：Bash、Python、Perl、Shell脚本
+- 服务管理：Apache、Nginx、MySQL、PostgreSQL、Tomcat、Redis等
+- 自动化运维工具：Ansible、SaltStack、Puppet、Chef
+- 监控工具：Zabbix、Prometheus、Grafana、Nagios
 
-项目名称：在线点单系统
-负责为门店“汐咖啡”部署和运维在线点餐系统，该系统为门店线上点单提供支持，目标是通过高效的技术架构确保系统的稳定性、高可用性和易扩展性。
-1.使用阿里云 ECS 部署基础架构动态分配资源，减少前期投入成本。
-2.使用阿里云 OSS 存储静态资源，减轻服务器负载，提高响应效率达 25%。
-3.安装 Redis、Swoole 和 Fileinfo 等 PHP 扩展，保证硬件设备接入并稳定运行。
-4.通过 宝塔面板实现服务器环境的可视化管理，显著降低了运维复杂性。
-5.编写 Shell 脚本实现 MySQL 数据库自动化备份，实现 MySQL 数据库的自动化备份。
+## 工作经历
+### LINUX运维工程师 | ABC科技有限公司 | 2019年3月 - 至今
+- 负责公司线上生产环境的维护和优化，确保系统稳定运行
+- 使用Ansible和SaltStack进行自动化部署与配置管理，大幅提升运维效率
+- 设计并实施了基于Prometheus+Grafana的监控系统，实现了对关键业务的实时监控和告警
+- 参与云上架构设计，优化了AWS上EC2、RDS、S3等资源的使用，降低了公司运营成本
+- 编写Shell和Python脚本，实现日常运维工作的自动化处理
+- 定期进行系统性能分析与优化，解决系统瓶颈问题
+
+## 项目经验
+### 云上架构设计与优化
+- 项目描述：为公司设计并优化了基于AWS的云上架构，包括EC2实例的合理分配、RDS数据库的性能调优以及S3存储的使用。
+- 职责与成果：
+  - 分析现有架构的不足，提出改进方案
+  - 使用Terraform进行基础设施即代码的管理
+  - 实现了系统性能提升30%，运营成本降低20%
+
+## 证书与培训
+- RHCE（Red Hat Certified Engineer）
+- AWS Certified Solutions Architect - Associate
+- ITIL Foundation Certificate in IT Service Management
