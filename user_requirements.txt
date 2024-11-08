@@ -1,33 +1,42 @@
-
+### 注意！不要写太长，突出重点，工作经历，工作经验和熟悉的技术栈即可
+### 注意！不要写太长，突出重点，工作经历，工作经验和熟悉的技术栈即可
+### 注意！不要写太长，突出重点，工作经历，工作经验和熟悉的技术栈即可
+### 注意！不要出现个人信息！！！简历仅做AI分析使用，不投给HR
 ## 个人信息
-- 学历：本科
-- 工作经验：1年
+- 学历：专科
+- 工作经验：2年
 
 ## 技能概述
-- 操作系统：熟练掌握Linux（CentOS、Ubuntu、RedHat、Debian等）系统管理
-- 编程语言：Bash、Python、Perl、Shell脚本
-- 服务管理：Apache、Nginx、MySQL、PostgreSQL、Tomcat、Redis等
-- 自动化运维工具：Ansible、SaltStack、Puppet、Chef
-- 监控工具：Zabbix、Prometheus、Grafana、Nagios
+- 熟悉 Linux 系统管理，包括用户管理、权限设置和系统优化。
+- Shell 脚本：熟练使用 Shell 编写自动化运维脚本，提升工作效率。
+- 文本处理工具：熟练使用 sed 和 awk 进行文本处理与数据分析。
+- Jenkins：熟悉 CI/CD 流水线的构建与管理，推动自动化部署流程
+- Zabbix：具备使用 Zabbix 进行系统监控、告警和性能优化的经验。
+- Nginx：熟悉 Nginx 的配置与优化，能够搭建高可用的 Web 服务和负载均衡。
+- MySQL：掌握 MySQL 的主从复制和读写分离，确保数据一致性与高可用性。
+- Redis：熟悉 Redis 的使用与优化，能够实现高效的数据缓存。
+- Docker：掌握 Docker 容器的构建与管理，熟悉镜像制作和容器编排。
+- Kubernetes：具备 Kubernetes 集群管理与应用部署的能力，能够使用 Helm 管理应用程序。
+- Keepalived：了解 Keepalived 的配置与使用，能实现高可用性解决方案。
 
 ## 工作经历
-### LINUX运维工程师 | ABC科技有限公司 | 2019年3月 - 至今
-- 负责公司线上生产环境的维护和优化，确保系统稳定运行
-- 使用Ansible和SaltStack进行自动化部署与配置管理，大幅提升运维效率
-- 设计并实施了基于Prometheus+Grafana的监控系统，实现了对关键业务的实时监控和告警
-- 参与云上架构设计，优化了AWS上EC2、RDS、S3等资源的使用，降低了公司运营成本
-- 编写Shell和Python脚本，实现日常运维工作的自动化处理
-- 定期进行系统性能分析与优化，解决系统瓶颈问题
-
+### LINUX运维工程师 |河南云创软件有限公司AB | 2022年7月 - 至今
+- 容器云平台实施与自动化运维:
+- 负责业务应用的容器化迁移项目
+- 在日常运维工作中
+- 用Kubernetes、Docker 等容器相关技术
 ## 项目经验
-### 云上架构设计与优化
-- 项目描述：为公司设计并优化了基于AWS的云上架构，包括EC2实例的合理分配、RDS数据库的性能调优以及S3存储的使用。
-- 职责与成果：
-  - 分析现有架构的不足，提出改进方案
-  - 使用Terraform进行基础设施即代码的管理
-  - 实现了系统性能提升30%，运营成本降低20%
+### k8s+docker部署CI/CD 持续集成持续交付
+- 项目简介：    通过 gitlab+jekins 实现自动化集成与自动化部署 
+主要职责：
+- 负责平台搭建并写安装文档
+- 编写脚本实现自动化制作镜像并上传到harbor 私仓，测试机可拉镜像进行测试。
+ 所应用的技术：
+- GitLab：
+- Jenkins：负
+- Docker：
+- Kubernetes：
+- Harbor：
+- Shell 脚本：
 
-## 证书与培训
-- RHCE（Red Hat Certified Engineer）
-- AWS Certified Solutions Architect - Associate
-- ITIL Foundation Certificate in IT Service Management
+##证书

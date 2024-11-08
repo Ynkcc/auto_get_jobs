@@ -149,6 +149,8 @@ def active_hr(boss_url, query, my_job_salary):
     # active_hr_jobs = []
     #获取工作列表
     position_matchs = check_position_match(query, my_job_salary)
+    print(f"正在整理分析数据，请耐心等待30-60秒")
+    time.sleep(random.uniform(30, 60))
     # print(f"当前有效岗位数量为：{len(position_matchs)},-----开始处理")
     #获取单个工作详情页
     for job in position_matchs:
