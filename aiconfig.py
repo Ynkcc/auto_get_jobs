@@ -128,13 +128,14 @@ def ai_hr(
         'max_tokens': 1024,
         'messages': messages
     }
-    try:
-        response = requests.post(URL, data=json.dumps(data), headers=headers)
-        story = response.json()["choices"][0]["message"]["content"]
-        return story
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-        
+    for _ in range(5):
+        try:
+            response = requests.post(URL, data=json.dumps(data), headers=headers)
+            story = response.json()["choices"][0]["message"]["content"]
+            return story
+        except requests.exceptions.RequestException as e:
+            print(f"请求错误，正在重试... 错误原因{e}")
+            time.sleep(1)
     return None
 
 

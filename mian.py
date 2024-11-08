@@ -170,7 +170,7 @@ def active_hr(boss_url, query, my_job_salary):
                 # print(f"HR活跃时间为：{hr_active_time}")
                 if hr_active_time not in ["本月活跃", "2月内活跃","3月内活跃", "4月内活跃", "5月内活跃", "半年前活跃"]:
                     chat_with_hr(soup)
-                    print(f"HR活跃程度为：{hr_active_time},开始分析简历...")
+                    print(f"HR活跃程度为：{hr_active_time},开始分析简历，耐心等待即可")
                  #HR在线率搞获取岗位名称开始对比
                  
             # active_hr_jobs.append(job)
@@ -195,15 +195,11 @@ def chat_with_hr(soup):
     )
     if chat_check.lower() == "true":
         startchat_button = wb.find_element(By.CSS_SELECTOR, ".btn.btn-startchat")
-        print(f"找到按钮: {startchat_button.text.strip()}")
         if startchat_button.is_enabled() and startchat_button.is_displayed():
-            print("按钮可点击")
             startchat_button = wb.find_element(By.CSS_SELECTOR, ".btn.btn-startchat")
             wb.execute_script("arguments[0].scrollIntoView(true);", startchat_button)
             startchat_button.click()
             time.sleep(8)
-        else:
-            print("按钮不可点击")
     return
 
 def check_job_match(soup):
