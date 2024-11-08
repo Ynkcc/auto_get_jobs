@@ -191,7 +191,8 @@ def is_hr_online(soup):
 
 def chat_with_hr(soup):
     chat_check = check_job_match(soup).strip()
-    print(f"是否推荐:{chat_check}")
+    print(f"AI分析投递结果:{chat_check}")
+    print(f"-----------------------------------------------------------------------------")
     WebDriverWait(wb, 10).until(
         EC.element_to_be_clickable((By.CSS_SELECTOR, ".btn.btn-startchat"))
     )

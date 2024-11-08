@@ -30,7 +30,12 @@ def ai_response(content):
     for _ in range(5):
         try:
             response = requests.post(URL, data=json.dumps(data), headers=headers)
-            story = response.json()["choices"][0]["message"]["content"]
+            response_json = response.json()
+            if "choices" not in response_json:
+                print(f"响应缺少 'choices' 字段，服务器返回: {response_json}")
+                time.sleep(1)
+                continue
+            story = response_json["choices"][0]["message"]["content"]
             return story
         except requests.exceptions.RequestException as e:
             print(f"请求错误，正在重试... 错误原因{e}")
@@ -131,6 +136,11 @@ def ai_hr(
     for _ in range(5):
         try:
             response = requests.post(URL, data=json.dumps(data), headers=headers)
+            response_json = response.json()
+            if "choices" not in response_json:
+                print(f"响应缺少 'choices' 字段，服务器返回: {response_json}")
+                time.sleep(1)
+                continue
             story = response.json()["choices"][0]["message"]["content"]
             return story
         except requests.exceptions.RequestException as e:
