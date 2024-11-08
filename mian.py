@@ -76,7 +76,7 @@ def get_job_info():
     jobs = []
     while True:
         
-        WebDriverWait(wb, 60).until(
+        WebDriverWait(wb, 120).until(
             EC.presence_of_element_located((By.CLASS_NAME, "job-name"))
         )
         time.sleep(random.uniform(3, 5))
