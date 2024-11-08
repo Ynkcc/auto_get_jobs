@@ -132,6 +132,8 @@ def check_position_match(query, my_job_salary):
         content=f'你是一个经验丰富的HR，你的任务是判断当前招聘岗位和薪资水平是否和我所期望的岗位匹配，如果匹配输出true，不匹配则输出false，除了true和false不要输出任何多余的内容，不要对基本信息讨论。以下是基本信息：当前招聘的岗位为“{job_name}”，招聘的岗位薪资为“{job_salary}k”，我所期望的岗位为“{query}”，最低薪资为“{my_job_salary}k”。'
         ai_res = ai_response(content)
         print(f"招聘岗位: {job_name}  |  期望岗位: {query}  |  AI判断结果: {ai_res}")
+        if job_name in ['诚聘', '小朋友', '底薪', '月入', '福利', '五险一金', '晋升']:
+            continue
         if ai_res.lower() == "true":
             position_matchs.append(job)
             # print(position_matchs)
@@ -154,6 +156,7 @@ def active_hr(boss_url, query, my_job_salary):
     # print(f"当前有效岗位数量为：{len(position_matchs)},-----开始处理")
     #获取单个工作详情页
     for job in position_matchs:
+
         job_link = job['job_link']
         job_detail = boss_url + job_link
         wb.get(job_detail)
@@ -166,7 +169,7 @@ def active_hr(boss_url, query, my_job_salary):
         try:
             if is_hr_online(soup):
                 chat_with_hr(soup)
-                print(f"当前HR在线，开始投递")
+                print(f"当前HR在线，开始投递,当前投递第{i}份")
             else:
                 hr_active_time = soup.find('span', class_='boss-active-time').text.strip()
                 # print(f"HR活跃时间为：{hr_active_time}")
