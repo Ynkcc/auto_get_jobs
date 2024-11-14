@@ -169,13 +169,13 @@ def active_hr(boss_url, query, my_job_salary):
         try:
             if is_hr_online(soup):
                 chat_with_hr(soup)
-                print(f"当前HR在线，开始投递,当前投递第{i}份")
             else:
                 hr_active_time = soup.find('span', class_='boss-active-time').text.strip()
                 # print(f"HR活跃时间为：{hr_active_time}")
-                if hr_active_time not in ["本月活跃", "2月内活跃","3月内活跃", "4月内活跃", "5月内活跃", "半年前活跃"]:
-                    chat_with_hr(soup)
+                if hr_active_time not in ["本月活跃", "2月内活跃","3月内活跃", "4月内活跃", "5月内活跃", "半年前活跃","近半年活跃"]:
                     print(f"HR活跃程度为：{hr_active_time},开始分析简历，耐心等待即可")
+                    chat_with_hr(soup)
+                    
                  #HR在线率搞获取岗位名称开始对比
                  
             # active_hr_jobs.append(job)
