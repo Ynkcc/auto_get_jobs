@@ -1,4 +1,12 @@
-beautifulsoup4==4.12.3
-python-dotenv==1.0.1
-requests==2.32.3
-selenium==4.26.1
+aiohttp==3.9.5
+azure-ai-projects
+azure-ai-inference
+azure-identity
+azure-search-documents
+pandas
+python-dotenv
+opentelemetry-api
+beautifulsoup4==4.13.3
+pdf2image==1.17.0
+Requests==2.32.3
+selenium==4.28.1

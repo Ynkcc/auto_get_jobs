@@ -17,6 +17,7 @@
 
 ## 注意事项
 - 如有能力，请自行确保Chrome浏览器和Chromedriver版本匹配，否则可能导致运行失败。
+- 强烈推荐使用miniconda,venv等虚拟环境替代系统环境python
 - APIKEY的有效性和余额需要自行管理。
 - 仅供学习参考使用，请勿用于非正规用途。
 - 大模型开发交流群: [QQ群](https://qm.qq.com/q/oTCtCdWX8A)
@@ -32,7 +33,8 @@
 1. **下载安装最新的Chrome浏览器**
    - [Chrome浏览器下载链接](https://www.google.cn/chrome/)
 2. **内置Chromedriver**
-   - 无需手动配置，但不能保证100%可用。如果遇到问题，请自行更新Chromedriver。
+   - 无需手动配置，但不能保证100%可用。Chrome和Chromedriver需要版本一致。
+   - [Chromedriver下载网址](https://googlechromelabs.github.io/chrome-for-testing)
 3. **Python 3.10**
    - [Python 3.10下载链接](https://www.python.org/downloads/)
 4. **克隆项目代码**

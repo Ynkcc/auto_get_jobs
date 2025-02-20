@@ -1,0 +1,35 @@
+
+{
+    "code": 0,
+    "message": "Success",
+    "zpData": {
+        "jobCard": {
+            "jobName": "运维（14薪 全额社保 大厂）",
+            "postDescription": "岗位职责：\n1、负责所在地的网络设备常规巡检。\n2、负责所在地的网路设备的应急报修、故障排除、备件更换。\n3、负责职场呼叫系统前端维护、需求收集。\n4、计算机相关设备维护。\n5、其它临时紧急任务处理。\n\n任职要求：\n1、较强的学习能力及强烈的责任心、有上进心。\n2、性格外向、温和、仪容整洁。\n3、熟悉Cisco、Brocade、H3C等主流网络厂商产品技术及产品架构；\n4、熟悉Linux操作系统的管理及常用工具的使用\n5、有思科\\华为网络产品的技术支持经验优先。\n7.大专以上学历，可以接受民本学历\n8. 2年以上IT桌面维护或技术支持经验\n9.精通台式电脑、笔记本电脑故障诊断\n10.精通Windows操作系统及常用办公软件",
+            "encryptJobId": "419da3a603395bee1Hdz0tW4FVNZ",
+            "salaryDesc": "8-13K·14薪",
+            "cityName": "海口",
+            "experienceName": "经验不限",
+            "degreeName": "大专",
+            "jobLabels": [
+                "网络运维"
+            ],
+            "address": "海口美兰区金凯大厦(美舍中路)海口市美兰区振兴南路11号",
+            "lid": "6SYDWYE1Ifr.search.1",
+            "sessionId": "",
+            "securityId": "W0jkRYF6cmzz0-f19pMceZE9p6K0-jZO3dXjodJBU31VBxF_Iy23ZUw0uhbFuVgMQROyyZz5",
+            "encryptUserId": "654cc737d88922350nZ729S8E1BY",
+            "bossName": "罗城",
+            "bossTitle": "招聘专员",
+            "bossAvatar": "https://img.bosszhipin.com/beijin/upload/avatar/20231211/607f1f3d68754fd0c8ec2ef68767a542a79c72cade511cfb41c9a2730d5d2e5fec1f45de88150bdd_s.png.webp",
+            "online": true,
+            "certificated": true,
+            "activeTimeDesc": "刚刚活跃",
+            "brandName": "深圳乐巢时代科技",
+            "canAddFriend": true,
+            "friendStatus": 0,
+            "isInterested": 0,
+            "login": true
+        }
+    }
+}
