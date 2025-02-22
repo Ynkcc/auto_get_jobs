@@ -2,3 +2,8 @@ chromedriver/chromedriver.exe
 login_data.json
 __pycache__
 .canda
+*.pdf
+*.docx
+*.png
+*.csv
+*.db

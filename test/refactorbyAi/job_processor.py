@@ -1,4 +1,4 @@
-from async_utils import TokenBucket, getJobInfo, startChat
+from utils_async import TokenBucket, getJobInfo, startChat
 from azure.ai.inference.aio import ChatCompletionsClient
 from azure.core.credentials import AzureKeyCredential
 import asyncio

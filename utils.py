@@ -209,9 +209,32 @@ def filterJobsBySalary(jobs,expectedSalary):
             max_monthly_salary = float(salary_range[1]) if len(salary_range) > 1 else min_monthly_salary
         else:
             #格式不对，直接放弃
-            print(f"薪资格式错误：招聘岗位: {job_name} | {job_salary}")
+            print(f"薪资格式错误 招聘岗位: {job_name} | {job_salary}")
             continue
         # 判断薪资是否满足条件
         if min_monthly_salary >= expectedSalary:
             jobsMatchingSalary.append(job)
+        else:
+            print(f"薪资太低 招聘岗位: {job_name} | {job_salary}")
     return jobsMatchingSalary   
+
+def parseParams(link):
+    """
+    从招聘链接中提取关键参数
+    
+    参数:
+        link (str): 完整的职位详情页链接
+        
+    返回:
+        tuple | bool: 
+            - 匹配成功时返回 (job_id, lid, security_id) 元组
+            - 匹配失败时返回 None
+            
+    示例:
+        >>> link = "https://www.zhipin.com/job_detail/419da3a603395bee1Hdz0tW4FVNZ.html?lid=6SYDWYE1Ifr.search.1&securityId=W0jkRYF6cmzz0"
+        >>> extract_job_params_from_link(link)
+        ('419da3a603395bee1Hdz0tW4FVNZ', '6SYDWYE1Ifr.search.1', 'W0jkRYF6cmzz0')
+    """
+    pattern = r'/job_detail/([^.]+)\.html\?lid=([^&]+)&securityId=([^&]+)'
+    match = re.search(pattern, link)
+    return match.groups() if match else None

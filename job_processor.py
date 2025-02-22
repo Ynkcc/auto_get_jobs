@@ -1,4 +1,5 @@
 from multiprocessing import Queue
+import traceback
 from utils import *
 import pandas as pd
 import json
@@ -18,13 +19,14 @@ from multiprocessing import Process, Queue, Event
 import aiohttp
 from azure.ai.inference.aio import ChatCompletionsClient
 from azure.core.credentials import AzureKeyCredential
-from async_utils import *
+from utils_async import *
 
 class JobProcessor:
-    def __init__(self, comm_queue: Queue, done_event):
+    def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event):
         self.comm_queue = comm_queue
+        self.recv_queue = recv_queue
         self.done_event = done_event
-        self.rate_limit = TokenBucket(rate=0.2, capacity=3)  # 限速设置，每秒最多3次请求
+        self.rate_limit = TokenBucket(rate=0.2, capacity=3)
         self.loop = None
         self.user_requirements = self._load_user_requirements()
         self.inactive_keywords = ["本月活跃", "2月内活跃", "3月内活跃", 
@@ -40,26 +42,28 @@ class JobProcessor:
             return ""
 
     async def _process_single_job(self, job_data, cookies, headers):
+        result = {
+            'job_id': None,
+            'job_data': None,
+            'analysis_result': None,
+            'applied_result': None
+        }
         # 解析job_link中的参数
         link = job_data['job_link']
-        match = re.search(r'/job_detail/([^.]+)\.html\?lid=([^&]+)&securityId=([^&]+)', link)
-        if not match:
-            return False
-            
-        job_id, lid, security_id = match.groups()
-        
+        job_id, lid, security_id = parseParams(link)
+        result['job_id'] = job_id
         # 实际的请求处理逻辑
         try:
 
             # 获取职位详细信息（限速）
             await self.rate_limit.get_token()  # 限速调用
             job_detail = await getJobInfo(security_id, lid, cookies, headers)
-
+            result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
             if active_status in self.inactive_keywords:
                 print(f"跳过{job_data['job_name']}：HR活跃状态[{active_status}]不符合要求")
-                return False
+                return result
 
             # 构建岗位要求
             card = job_detail['zpData']['jobCard']
@@ -78,21 +82,25 @@ class JobProcessor:
 
             # 不限速调用
             ai_result = await aiHrCheck(analysis_data)
-            
+            result['analysis_result'] = ai_result
 
             if ai_result:
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
-                result = await startChat(security_id, job_id, lid, cookies, headers)
-                print(f"job {job_data['job_name']}: {result['message']}\n{job_requirements}\n\n")
-
+                apply_result  = await startChat(security_id, job_id, lid, cookies, headers)
+                print(f"job {job_data['job_name']}: {apply_result ['message']}\n{job_requirements}\n\n")
             else:
                 print(f"job {job_data['job_name']}: ai认为不匹配\n{job_requirements}\n\n")
-            return True
+
+            return result
     
         except Exception as e:
-            print(f"Error processing job {job_data['job_name']},{job_id}:\n {str(e)}")
-            return False
+            print(
+                f"Error processing job {job_data['job_name']}, {job_id}:\n"
+                f"Error: {str(e)}\n"
+                f"Traceback: {traceback.format_exc()}"
+            )
+            return result
 
     async def _process_batch(self, jobs_batch, cookies, headers):
         tasks = [self._process_single_job(job, cookies, headers) for job in jobs_batch]
@@ -115,4 +123,5 @@ class JobProcessor:
 
             results = self.loop.run_until_complete(self._process_batch(jobs_batch, cookies, headers))
             print(f"Processed batch with {len(results)} jobs")
+            self.recv_queue.put(results)
             self.done_event.set()  # 通知主进程处理完成
