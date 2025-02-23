@@ -53,10 +53,11 @@ class JobDetail(Base):
 class DatabaseManager:
     """数据库管理类，提供优化的CRUD操作"""
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, userId: str):
         self.engine = create_engine(f'sqlite:///{db_path}', pool_pre_ping=True)
         self._create_tables()
         self.Session = sessionmaker(bind=self.engine)
+        self.userId = userId
 
     def _create_tables(self):
         """确保表结构存在并自动添加新增列"""
@@ -76,7 +77,8 @@ class DatabaseManager:
         """
         if not jobs:
             raise ValueError("jobs不能为空")
-
+        if not jobs_details:
+            jobs_details = []
         with self.Session() as session:
             try:
                 # 构建基础数据字典
@@ -148,7 +150,7 @@ class DatabaseManager:
             'bossTitle': card.get('bossTitle'),
             'bossAvatar': card.get('bossAvatar', ''),
             'analysisResult':detail.get("analysis_result"),
-            'applied_account': "9189",#用户id，#TODO
+            'applied_account': self.userId,#用户id
             'visited': True,
             "activeTimeDesc":card.get("activeTimeDesc")
         }

@@ -1,4 +1,4 @@
-aiohttp==3.9.5
+aiohttp
 azure-ai-projects
 azure-ai-inference
 azure-identity
@@ -6,7 +6,8 @@ azure-search-documents
 pandas
 python-dotenv
 opentelemetry-api
-beautifulsoup4==4.13.3
-pdf2image==1.17.0
-Requests==2.32.3
-selenium==4.28.1
+beautifulsoup4
+pdf2image
+Requests
+selenium
+sqlalchemy

@@ -13,7 +13,7 @@ import re
 import asyncio
 import random
 from multiprocessing import Process, Queue, Event
-
+import requests
 
 
 
@@ -238,3 +238,24 @@ def parseParams(link):
     pattern = r'/job_detail/([^.]+)\.html\?lid=([^&]+)&securityId=([^&]+)'
     match = re.search(pattern, link)
     return match.groups() if match else None
+
+def getUserInfo(driver):
+    cookies = driver.get_cookies()
+    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+    headers = {
+        'User-Agent': driver.execute_script("return navigator.userAgent;")
+    }
+    url="https://www.zhipin.com/wapi/zpuser/wap/getUserInfo.json"
+    try:
+        userInfo=requests.get(url,cookies=cookies_dict,headers=headers).json()
+        userId=userInfo['zpData']['userId']
+        userName=userInfo['zpData']['name']
+        trueMan=userInfo['zpData']['trueMan']
+        print(f"成功获取到用户信息: 用户名是：{userName},账号id是：{userId}")
+        if not trueMan:
+            print("警告：本账号已被BOSS直聘标记")
+    except Exception as e:
+        print("获取用户信息失败")
+        print(e)
+        return "UNKNOWN",None
+    return userId, userInfo

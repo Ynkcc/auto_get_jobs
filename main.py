@@ -36,7 +36,8 @@ def login(driver):
     print(f"登陆成功。")
 
 def main_loop(driver, extraData):
-    db_manager = DatabaseManager('jobs.db')
+    userId, _ =getUserInfo(driver)
+    db_manager = DatabaseManager('jobs.db',userId)
     recv_queue = Queue()
     comm_queue = Queue()
     done_event = Event()
