@@ -7,3 +7,5 @@ __pycache__
 *.png
 *.csv
 *.db
+cookies/*
+config.yaml

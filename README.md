@@ -4,6 +4,7 @@
 请查看 **[原项目](https://github.com/SanThousand/auto_get_jobs)**
 
 ## 补充说明
+初次使用，复制项目目录下的config.yaml.sample，重命名为config.yaml后进行修改，其余步骤参考原项目
 
 可以使用以下插件 [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) 查看保存的数据库`jobs.db`
 
@@ -22,3 +23,4 @@
 - [ ] 配置文件包含完整的岗位筛选项,如行业，岗位类型，具体到区，或者按区搜索，查询到更多岗位
 - [ ] 完善一下文档
 - [ ] 使用qt创建一个图形化界面
+- [ ] selenium反反爬
