@@ -8,13 +8,13 @@ from utils import *
 from multiprocessing import Process, Queue, Event
 from job_processor import JobProcessor
 
-load_dotenv()
-
-def login(driver):
+def login(driver,account):
     """
     登录BOSS直聘
     """
-
+    account_name =account.get("username")
+    login_file=f"./cookies/{account_name}.json"
+    manager = SessionManager(driver, login_file)
     #登录URl
     login_url = "https://www.zhipin.com/web/user/?ka=header-login"
     driver.get(login_url)
@@ -22,78 +22,85 @@ def login(driver):
     #等待用户登录
     print(f"等待登陆...")
     #加载cookies
-    if load_login_data(driver):
-        driver.get(login_url)
+    if manager.load():
+        driver.refresh()
 
     WebDriverWait(driver, timeout="600").until(
             EC.presence_of_element_located((By.XPATH, '//a[@ka="header-username"]'))
         )
 
-    # 登录成功后保存登录数据
-    save_login_data(driver)
-    #启动一个线程来定期保存
-    start_cookie_saver(driver)
+    manager.start_autosave()
     print(f"登陆成功。")
+    return manager
 
-def main_loop(driver, extraData):
+def main_loop(driver, config):
+
+    # 从配置中获取参数
+    databaseFileName = config['database']['filename']
+    job_search =config['job_search']
+    crawler_config = config['crawler']
+    page_load_timeout=crawler_config.get("page_load_timeout", 60)
+    next_page_delay=crawler_config.get("next_page_delay", 5)
+    minSalary,_ = config["job_check"]["salary_range"]
+
     userId, _ =getUserInfo(driver)
-    db_manager = DatabaseManager('jobs.db',userId)
+    db_manager = DatabaseManager(databaseFileName,userId)
     recv_queue = Queue()
     comm_queue = Queue()
     done_event = Event()
-    processor = JobProcessor(comm_queue,recv_queue,done_event)  # 传入db_queue
+    processor = JobProcessor(comm_queue,recv_queue,done_event,config)  # 传入db_queue
     
     # 启动处理进程
     process = Process(target=processor.start_processing)
     process.start()
 
     try:
-        targetUrl = buildSearchUrl(extraData["query"], extraData["city"])
-        driver.get(targetUrl)
-        
-        while True:
-            # 等待页面加载
-            WebDriverWait(driver, 40).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
-            )
-            
-            # 获取并过滤当前页职位
-            jobs = getPageJobsInfo(driver)
-            valid_jobs = filterJobsBySalary(jobs, extraData["expectedSalary"])
-            #过滤访问过的
-            valid_jobs = db_manager.filterVisited(valid_jobs)
-            jobsDetails=None
-            if valid_jobs:
+        for targetUrl in buildSearchUrl(job_search):
 
-                # 获取 cookies 和 headers
-                cookies = driver.get_cookies()
-                cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-                headers = {
-                    'User-Agent': driver.execute_script("return navigator.userAgent;")
-                }
-                # 发送当前批次任务
-                comm_queue.put({
-                    "jobs": valid_jobs,
-                    "cookies": cookies_dict,
-                    "headers": headers
-                })
-                done_event.clear()  # 重置事件状态
+            driver.get(targetUrl)            
+            while True:
+                # 等待页面加载
+                WebDriverWait(driver, page_load_timeout).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
+                )
                 
-                # 等待本批次处理完成
-                while not done_event.wait(timeout=60):
-                    print("Waiting for batch processing...")
-                    time.sleep(5)
-                jobsDetails = recv_queue.get()
-            #存放到数据库
-            # save_jobs_to_csv(jobsDetails,"jobsDetails.csv")
-            # save_jobs_to_csv(jobs,"jobs.csv")
-            db_manager.save_jobs_details(jobs,jobsDetails)
-            
-            # 翻页逻辑
-            time.sleep(15)
-            if not nextPage(driver):
-                break
+                # 获取并过滤当前页职位
+                jobs = getPageJobsInfo(driver)
+                valid_jobs = filterJobsBySalary(jobs, minSalary)
+                #过滤访问过的
+                valid_jobs = db_manager.filterVisited(valid_jobs)
+                jobsDetails=None
+                if valid_jobs:
+
+                    # 获取 cookies 和 headers
+                    cookies = driver.get_cookies()
+                    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+                    headers = {
+                        'User-Agent': driver.execute_script("return navigator.userAgent;")
+                    }
+                    # 发送当前批次任务
+                    comm_queue.put({
+                        "jobs": valid_jobs,
+                        "cookies": cookies_dict,
+                        "headers": headers
+                    })
+                    done_event.clear()  # 重置事件状态
+                    
+                    # 等待本批次处理完成
+                    while not done_event.wait(timeout=60):
+                        print("Waiting for batch processing...")
+                        time.sleep(5)
+                    jobsDetails = recv_queue.get()
+                #存放到数据库
+                # save_jobs_to_csv(jobsDetails,"jobsDetails.csv")
+                # save_jobs_to_csv(jobs,"jobs.csv")
+                db_manager.save_jobs_details(jobs,jobsDetails)
                 
+                # 翻页逻辑
+                time.sleep(next_page_delay)
+                if not nextPage(driver):
+                    break
+
     finally:
         # 发送终止信号并等待进程结束
         comm_queue.put(None)
@@ -101,17 +108,14 @@ def main_loop(driver, extraData):
 
 
 def main():
-    driver=init_driver()
-    login(driver)
-    # while True:
-    #     time.sleep(3)
-    extraData={
-        "query":"运维",
-        "city":"海口",
-        "expectedSalary":6
-    }
+    config=load_config("config.yaml")
+    driver=init_driver(config['crawler']["webdriver"])
+    for account in config['accounts']:
+        manager=login(driver,account)
+        main_loop(driver,config)
+        manager.stop_autosave()
+        manager.clear_data()
 
-    main_loop(driver,extraData)
 
 if __name__=="__main__":
     main()

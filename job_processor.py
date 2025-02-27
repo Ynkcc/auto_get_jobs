@@ -22,24 +22,18 @@ from azure.core.credentials import AzureKeyCredential
 from utils_async import *
 
 class JobProcessor:
-    def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event):
+    def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config):
         self.comm_queue = comm_queue
         self.recv_queue = recv_queue
         self.done_event = done_event
-        self.rate_limit = TokenBucket(rate=0.2, capacity=3)
         self.loop = None
-        self.user_requirements = self._load_user_requirements()
-        self.inactive_keywords = ["本月活跃", "2月内活跃", "3月内活跃", 
-                                "4月内活跃", "5月内活跃", "半年前活跃", "近半年活跃"]
 
-    def _load_user_requirements(self):
-        """从文件加载用户简历"""
-        try:
-            with open('user_requirements.md', 'r', encoding='utf-8') as f:
-                return f.read()
-        except FileNotFoundError:
-            print("警告：未找到user_requirements.md文件")
-            return ""
+        self.ai_analyzer = AIAnalyzer(config["ai"])
+
+        self.rate_limit = TokenBucket(rate=0.8, capacity=3)
+
+        self.inactive_keywords = config["job_check"]["inactive_status"]
+
 
     async def _process_single_job(self, job_data, cookies, headers):
         result = {
@@ -74,14 +68,9 @@ class JobProcessor:
                 f"学历要求：{card['degreeName']}"
             )
 
-            # 准备AI分析参数
-            analysis_data = {
-                "job_requirements": job_requirements,
-                "user_requirements": self.user_requirements
-            }
 
             # 不限速调用
-            ai_result = await aiHrCheck(analysis_data)
+            ai_result = await self.ai_analyzer.aiHrCheck(job_requirements)
             result['analysis_result'] = ai_result
 
             if ai_result:

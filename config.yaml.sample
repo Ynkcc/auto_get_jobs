@@ -1,0 +1,98 @@
+# config.yaml
+
+# =============== 爬虫配置 ===============
+crawler:
+  webdriver:
+    headless: false  # 是否使用无头模式（true/false）
+  rate_limit: 0.2    # 请求速率限制（次/秒）仅对boss直聘的请求生效
+  next_page_delay: 5 # 翻页延迟（秒）
+  request_timeout: 30 # 请求超时时间（秒）
+  page_load_timeout: 60 # 页面加载超时时间（秒）
+
+# =============== AI 配置 ===============
+ai:
+  provider: "azure"   # 服务商（azure/openai） openai代表openai兼容接口
+  model: "DeepSeek-R1"            # 模型名称记得填写,不建议使用包含思考过程的模型
+  temperature: 0.2
+  api_key: "ckzNFXH0kxx8jY0ykoAJmxy4bjrlJZQikAxrSHK2raWRWQWbb2EKJQQJ99BBACHYHv6XJ3w3AAAAACOG5gdc"  
+  api_url: "https://ai-evilsynk6832ai032785348492.services.ai.azure.com/models/chat/completions"  #完整url链接
+  prompt: |  # AI分析提示词模板
+    帮助用户判断这个岗位是否合适
+    输出严格遵循以下规则：只返回"true"或"false"
+  resume_for_ai_file: "user_requirements.md"  # 用户简历文件路径
+
+# =============== 申请配置 ===============
+# 未实现
+application:
+  greeting: 
+    enable_ai: false  # 是否使用AI生成招呼语
+    template: |
+      尊敬的HR您好，
+      我对贵司的{job_name}岗位很感兴趣，
+      我的技能包括：{skills}，
+      期待与您进一步沟通！
+  resume_file: "./resume.pdf"  # 附件简历路径
+
+# =============== 日志配置 ===============
+# 尚未实现
+logging:
+  level: INFO      # 日志级别（DEBUG/INFO/WARNING/ERROR）
+  path: app.log    # 日志文件路径
+  max_size: 10     # 日志文件最大大小（MB）
+
+# =============== 数据库配置 ===============
+database:
+  filename: "jobs.db"
+  # 未实现
+  export:
+    excel: true
+    excel_path: "./exports"
+    keep_days: 30  # 数据保留天数
+
+# =============== 岗位搜索配置 ===============
+job_search:
+  # 注意：避免参数过多导致组合结果爆炸
+  city: ["海口"]         # 目标城市列表（设置区域时自动忽略）
+  query: ["运维"]        # 搜索关键词列表
+  areas: {}            # 区域配置（示例："北京":["东城区","西城区"]）
+  degree: []      # 学历要求（不限/大专/本科/硕士/博士）
+  experience: ["1-3年","经验不限"] # 经验要求
+  position: []         # 岗位名称过滤
+  industry: ["互联网", "计算机软件"] # 行业过滤
+  salary: ["3K以下"]   # 薪资范围过滤（只用来过滤，薪资判断的部分使用salary_range）
+  jobType: []          # 工作类型（全职/兼职）
+  scale: ["20-99人", "100-499人"] # 公司规模
+  stage: []            # 公司融资阶段
+
+# =============== 账号配置 ===============
+accounts:
+  - username: "account1"
+  - username: "account2"
+
+# =============== 公司筛选配置 ===============
+job_check:
+  salary_range: [3, 20]  # 期望薪资范围（K）,目前只处理最低薪资
+  inactive_status:       # HR活跃状态排除项
+    - 本月活跃
+    - 2月内活跃
+    - 3月内活跃
+    - 4月内活跃
+    - 5月内活跃
+    - 半年前活跃
+    - 近半年活跃
+  check_insurance: true  # 是否检查社保人数（未实现）
+  min_insured: 10        # 最小参保人数（未实现）
+  exclude_outsource: true # 排除外包公司（未实现）
+
+# =============== 通知配置 ===============
+#未实现
+notification:
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    username: "user@example.com"
+    password: "password123"
+    receivers: ["receiver@example.com"]
+  webhook:
+    enabled: true
+    url: "https://api.example.com/webhook"

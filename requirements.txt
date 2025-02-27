@@ -1,8 +1,4 @@
 aiohttp
-azure-ai-projects
-azure-ai-inference
-azure-identity
-azure-search-documents
 pandas
 python-dotenv
 opentelemetry-api
@@ -11,3 +7,4 @@ pdf2image
 Requests
 selenium
 sqlalchemy
+pyyaml
