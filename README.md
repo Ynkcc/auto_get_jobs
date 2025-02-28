@@ -1,5 +1,6 @@
 # BOSS直聘自动投简历
 
+本项目fork自 [SanThousand/auto_get_jobs](https://github.com/SanThousand/auto_get_jobs)
 ## 项目简介
 请查看 **[原项目](https://github.com/SanThousand/auto_get_jobs)**
 
@@ -8,7 +9,17 @@
 
 可以使用以下插件 [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) 查看保存的数据库`jobs.db`
 
-### 可以做的
+---
+目前仍在开发，部分功能可能不可用
+
+如果你在使用过程中遇到bug，请提交反馈
+
+如果你喜欢PYTHON，且愿意为本项目做贡献。欢迎PR
+
+交流群 `487194990`
+
+---
+### 项目计划
 - [ ] 添加一个配置文件，替代`user_requirements.md,.env`
 - [ ] 使用logger替代print
 - [ ] 添加数据库导出excel
@@ -24,3 +35,6 @@
 - [ ] 完善一下文档
 - [ ] 使用qt创建一个图形化界面
 - [ ] selenium反反爬
+
+## LICENSE
+[GNU General Public License v3.0](./LICENSE)

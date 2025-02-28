@@ -72,13 +72,15 @@ class AIAnalyzer():
                         
                         origin_content = data['choices'][0]['message']['content'].lower()
                         match = re.match(r"<think>(.*?)</think>(.*)", origin_content, re.DOTALL)
+                        aithink =None
                         if match:
-                            # print("\tThinking:", match.group(1))
+                            aithink= match.group(1)
                             # print("\tAnswer:", match.group(2))
                             content= match.group(2)
                         else:
                             content=origin_content
-                        return "true" in content
+                        checkResult= "true" in content
+                        return checkResult,aithink
 
             except aiohttp.ClientError as e:
                 print(f"网络请求失败 ({attempt+1}/5): {str(e)}")

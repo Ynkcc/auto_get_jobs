@@ -33,12 +33,13 @@ class JobProcessor:
         self.inactive_keywords = config["job_check"]["inactive_status"]
 
 
-    async def _process_single_job(self, job_data, cookies, headers):
+    async def _original_process_single_job(self, job_data, cookies, headers):
         result = {
             'job_id': None,
             'job_data': None,
             'analysis_result': None,
-            'applied_result': None
+            'applied_result': None,
+            'analysis_think':None
         }
         # 解析job_link中的参数
         link = job_data['job_link']
@@ -68,8 +69,11 @@ class JobProcessor:
 
 
             # 不限速调用
-            ai_result = await self.ai_analyzer.aiHrCheck(job_requirements)
+            ai_result,ai_think = await self.ai_analyzer.aiHrCheck(job_requirements)
             result['analysis_result'] = ai_result
+            if ai_think:
+                result['analysis_think'] = ai_think
+                print(ai_think)
 
             if ai_result:
                 # 限速调用
@@ -89,6 +93,16 @@ class JobProcessor:
             )
             return result
 
+    async def _process_single_job(self, job_data, cookies, headers):
+        try:
+            return await asyncio.wait_for(
+                self._original_process_single_job(job_data, cookies, headers),
+                timeout=120.0  # 每个任务单独超时
+            )
+        except asyncio.TimeoutError:
+            print(f"Job {job_data['job_name']} timed out")
+            return None  # 超时后的处理结果
+    
     async def _process_batch(self, jobs_batch, cookies, headers):
         tasks = [self._process_single_job(job, cookies, headers) for job in jobs_batch]
         return await asyncio.gather(*tasks)
@@ -108,7 +122,17 @@ class JobProcessor:
             headers = batch.get("headers")
             jobs_batch = batch.get("jobs")
 
-            results = self.loop.run_until_complete(self._process_batch(jobs_batch, cookies, headers))
-            print(f"Processed batch with {len(results)} jobs")
+            try:
+                results = self.loop.run_until_complete(
+                    asyncio.wait_for(
+                        self._process_batch(jobs_batch, cookies, headers),
+                        timeout=600  # 单位：秒
+                    )
+                )
+                print(f"Processed batch with {len(results)} jobs")
+            except asyncio.TimeoutError:
+                print("Batch processing timed out after 600 seconds")
+                results = []  # 超时后的处理逻辑
+            results = [result for result in results if result is not None]
             self.recv_queue.put(results)
             self.done_event.set()  # 通知主进程处理完成

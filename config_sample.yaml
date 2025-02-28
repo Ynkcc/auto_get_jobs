@@ -23,6 +23,7 @@ ai:
   api_url: "https://ai-evilsynk6832ai032785348492.services.ai.azure.com/models/chat/completions"  #完整url链接
   prompt: |  # AI分析提示词模板
     帮助用户判断这个岗位是否合适
+    岗位应与用户简历提供的方向一致
     输出严格遵循以下规则：只返回"true"或"false"
   resume_for_ai_file: "user_requirements.md"  # 用户简历文件路径
 
@@ -57,16 +58,16 @@ database:
 # =============== 岗位搜索配置 ===============
 job_search:
   # 注意：避免参数过多导致组合结果爆炸
-  city: ["海口"]         # 目标城市列表（设置区域时自动忽略）
+  city: ["海口","文昌"]         # 目标城市列表（设置区域时自动忽略）
   query: ["运维"]        # 搜索关键词列表
   areas: {}            # 区域配置（示例："北京":["东城区","西城区"]）
   degree: []      # 学历要求（不限/大专/本科/硕士/博士）
-  experience: ["1-3年","经验不限"] # 经验要求
+  experience: ["1-3年","经验不限","1年以内"] # 经验要求
   position: []         # 岗位名称过滤
   industry: [] # 行业过滤
   salary: []   # 薪资范围过滤（只用来过滤，薪资判断的部分使用salary_range）
   jobType: []          # 工作类型（全职/兼职）
-  scale: ["20-99人"] # 公司规模
+  scale: [] # 公司规模
   stage: []            # 公司融资阶段
 
 # =============== 账号配置 ===============
