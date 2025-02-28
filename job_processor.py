@@ -17,8 +17,6 @@ import asyncio
 import random
 from multiprocessing import Process, Queue, Event
 import aiohttp
-from azure.ai.inference.aio import ChatCompletionsClient
-from azure.core.credentials import AzureKeyCredential
 from utils_async import *
 
 class JobProcessor:
@@ -29,8 +27,8 @@ class JobProcessor:
         self.loop = None
 
         self.ai_analyzer = AIAnalyzer(config["ai"])
-
-        self.rate_limit = TokenBucket(rate=0.8, capacity=3)
+        self.crawler = config["crawler"]
+        self.rate_limit = TokenBucket(rate=self.crawler["rate_limit"]["rate"], capacity=self.crawler["rate_limit"]["capacity"])
 
         self.inactive_keywords = config["job_check"]["inactive_status"]
 

@@ -3,8 +3,13 @@
 # =============== 爬虫配置 ===============
 crawler:
   webdriver:
-    headless: false  # 是否使用无头模式（true/false）
-  rate_limit: 0.2    # 请求速率限制（次/秒）仅对boss直聘的请求生效
+    browser_type: edge  # 新增浏览器类型选项（chrome/edge）
+    chrome_driver_path: "driver/chromedriver.exe"  # 原路径改为配置项
+    edge_driver_path: "driver/msedgedriver.exe"  # 新增Edge驱动路径
+    headless: false
+  rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
+    rate: 0.2  # 每秒生成的令牌数
+    capacity: 3  # 桶的容量
   next_page_delay: 5 # 翻页延迟（秒）
   request_timeout: 30 # 请求超时时间（秒）
   page_load_timeout: 60 # 页面加载超时时间（秒）
@@ -58,10 +63,10 @@ job_search:
   degree: []      # 学历要求（不限/大专/本科/硕士/博士）
   experience: ["1-3年","经验不限"] # 经验要求
   position: []         # 岗位名称过滤
-  industry: ["互联网", "计算机软件"] # 行业过滤
-  salary: ["3K以下"]   # 薪资范围过滤（只用来过滤，薪资判断的部分使用salary_range）
+  industry: [] # 行业过滤
+  salary: []   # 薪资范围过滤（只用来过滤，薪资判断的部分使用salary_range）
   jobType: []          # 工作类型（全职/兼职）
-  scale: ["20-99人", "100-499人"] # 公司规模
+  scale: ["20-99人"] # 公司规模
   stage: []            # 公司融资阶段
 
 # =============== 账号配置 ===============

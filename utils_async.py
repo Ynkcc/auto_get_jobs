@@ -1,7 +1,5 @@
 import os
 import aiohttp
-from azure.ai.inference.aio import ChatCompletionsClient
-from azure.core.credentials import AzureKeyCredential
 import time
 import asyncio
 import re

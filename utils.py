@@ -128,18 +128,51 @@ class SessionManager:
 
 # 初始化 WebDriver
 def init_driver(webdriverConfig):
-    options = webdriver.ChromeOptions()
-    options.add_argument("--disable-blink-features=AutomationControlled")  # 防止被检测为自动化工具
+    # 根据配置选择浏览器类型
+    browser_type = webdriverConfig.get("browser_type", "chrome").lower()
+    
+    if browser_type == "edge":
+        from selenium.webdriver.edge.options import Options as EdgeOptions
+        from selenium.webdriver.edge.service import Service as EdgeService
+        
+        options = EdgeOptions()
+        driver_path = os.path.join(webdriverConfig.get("edge_driver_path", "driver/msedgedriver.exe"))
+        ServiceClass = EdgeService
+    else:  # 默认使用Chrome
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        
+        options = ChromeOptions()
+        driver_path = os.path.join(webdriverConfig.get("chrome_driver_path", "driver/chromedriver.exe"))
+        ServiceClass = ChromeService
+
+    # 公共配置项
+    options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
-    options.set_capability('goog:loggingPrefs', {'performance': 'OFF'})  # 关闭性能日志
-    options.add_argument('--log-level=3')  # 只记录严重错误
+    
+    # Edge需要特殊处理日志设置
+    if browser_type == "edge":
+        options.set_capability('ms:loggingPrefs', {'performance': 'OFF'})
+    else:
+        options.set_capability('goog:loggingPrefs', {'performance': 'OFF'})
+        
+    # 无头模式配置
     if webdriverConfig.get("headless", False):
-        #无头模式访问
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")  # 新版推荐写法
         options.add_argument("window-size=1920,1080")
-    driver_path = os.path.join("chromedriver", "chromedriver.exe")
-    driver = webdriver.Chrome(service=Service(driver_path),options=options)
+
+    # 初始化浏览器驱动
+    if browser_type == "edge":
+        driver = webdriver.Edge(
+            service=ServiceClass(executable_path=driver_path),
+            options=options
+        )
+    else:
+        driver = webdriver.Chrome(
+            service=ServiceClass(executable_path=driver_path),
+            options=options
+        )
 
     return driver
 
@@ -251,7 +284,7 @@ def buildSearchUrl(job_search):
 
             # 递归生成参数组合
             def param_generator(keys, values, index=0, current_params=None):
-                current_params = dict(base_params) if current_params is None else current_params.copy()
+                current_params = current_params.copy()
                 if index == len(keys):
                     param_str = '&'.join(f"{k}={v}" for k, v in sorted(current_params.items()))
                     yield f"{base_url}?{param_str}"
