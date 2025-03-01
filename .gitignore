@@ -1,11 +1,4 @@
-driver/*.exe
-login_data.json
 __pycache__
-.canda
-*.pdf
-*.docx
-*.png
-*.csv
-*.db
-cookies/*
-config.yaml
+driver/*.exe
+config/config.yaml
+data/*

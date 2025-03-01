@@ -5,7 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import json
 from typing import List, Optional, Dict, Any
-from utils import parseParams
+import re
+
 
 Base = declarative_base()
 
@@ -83,7 +84,7 @@ class DatabaseManager:
             try:
                 # 构建基础数据字典
                 job_dict = {
-                    parseParams(job["job_link"])[0]: self._build_base_job(job)
+                    self.parseParams(job["job_link"])[0]: self._build_base_job(job)
                     for job in jobs
                 }
 
@@ -124,7 +125,7 @@ class DatabaseManager:
 
     def _build_base_job(self, job: Dict) -> Dict:
         """构建基础数据记录"""
-        encryptJobId, lid, securityId = parseParams(job["job_link"])
+        encryptJobId, lid, securityId = self.parseParams(job["job_link"])
         return {
             'jobName': job.get('job_name'),
             'salaryDesc': job.get('job_salary'),
@@ -172,6 +173,14 @@ class DatabaseManager:
                 # 插入新记录
                 new_record = JobDetail(**record)
                 session.add(new_record)
+    @staticmethod
+    def parseParams(link):
+        """
+        从招聘链接中提取关键参数
+        """
+        pattern = r'/job_detail/([^.]+)\.html\?lid=([^&]+)&securityId=([^&]+)'
+        match = re.search(pattern, link)
+        return match.groups() if match else None
 
     def check_visited(self, job_id):
         session = self.Session()
@@ -185,7 +194,7 @@ class DatabaseManager:
         filteredJobs=[]
         for job in jobs:
             job_name = job['job_name']
-            job_id = parseParams(job["job_link"])[0]
+            job_id = self.parseParams(job["job_link"])[0]
             checkResult=self.check_visited(job_id)
             if checkResult:
                 print(f"已经访问过 招聘岗位: {job_name}")

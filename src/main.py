@@ -3,9 +3,9 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 import time
-from utils_database import DatabaseManager
-from utils import *
 from multiprocessing import Process, Queue, Event
+from utils.general import *
+from utils.db_utils import DatabaseManager
 from job_processor import JobProcessor
 
 def login(driver,account):
@@ -13,7 +13,7 @@ def login(driver,account):
     登录BOSS直聘
     """
     account_name =account.get("username")
-    login_file=f"./cookies/{account_name}.json"
+    login_file=f"./data/{account_name}.json"
     manager = SessionManager(driver, login_file)
     #登录URl
     login_url = "https://www.zhipin.com/web/user/?ka=header-login"
@@ -108,7 +108,7 @@ def main_loop(driver, config):
 
 
 def main():
-    config=load_config("config.yaml")
+    config=load_config("config/config.yaml")
     driver=init_driver(config['crawler']["webdriver"])
     for account in config['accounts']:
         manager=login(driver,account)

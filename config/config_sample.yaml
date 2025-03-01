@@ -48,7 +48,7 @@ logging:
 
 # =============== 数据库配置 ===============
 database:
-  filename: "jobs.db"
+  filename: "data/jobs.db"
   # 未实现
   export:
     excel: true

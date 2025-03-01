@@ -17,7 +17,8 @@ import asyncio
 import random
 from multiprocessing import Process, Queue, Event
 import aiohttp
-from utils_async import *
+from utils.async_utils import *
+from utils.general import parseParams
 
 class JobProcessor:
     def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config):
