@@ -2,10 +2,12 @@
 > 仅供Python爱好者，交流学习
 
 ### 其他同类项目
-- [yangfeng20/boss_batch_push](https://github.com/yangfeng20/boss_batch_push)
-- [uniStark/get-jobs-boss](https://github.com/uniStark/get-jobs-boss)
-- [Ocyss/boos-helper](https://github.com/Ocyss/boos-helper) 
-- [IceyOrange/AutoBOSS](https://github.com/IceyOrange/AutoBOSS)
+- [yangfeng20/boss_batch_push](https://github.com/yangfeng20/boss_batch_push) 油猴脚本
+- [loks666/get_jobs](https://github.com/loks666/get_jobs) Java项目，多平台
+- [lastsunday/job-hunting](https://github.com/lastsunday/job-hunting) 浏览器插件，多平台
+- [Ocyss/boos-helper](https://github.com/Ocyss/boos-helper) 浏览器插件
+- [IceyOrange/AutoBOSS](https://github.com/IceyOrange/AutoBOSS)  Python项目 
+- [Frrrrrrrrank/auto_job__find__chatgpt__rpa](https://github.com/Frrrrrrrrank/auto_job__find__chatgpt__rpa) Python项目
 
 本项目fork自 [SanThousand/auto_get_jobs](https://github.com/SanThousand/auto_get_jobs)
 ## 项目简介
