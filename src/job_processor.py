@@ -101,8 +101,12 @@ class JobProcessor:
                 timeout=120.0  # 每个任务单独超时
             )
         except asyncio.TimeoutError:
-            print(f"Job {job_data['job_name']} timed out")
-            return None  # 超时后的处理结果
+            print(f"Job {job_data['job_name']} 被强制取消")
+            return None
+        except asyncio.CancelledError:
+            print(f"Job {job_data['job_name']} 收到取消信号")  # 关键日志
+            # 必须重新抛出保证取消传播
+            #raise
     
     async def _process_batch(self, jobs_batch, cookies, headers):
         tasks = [self._process_single_job(job, cookies, headers) for job in jobs_batch]

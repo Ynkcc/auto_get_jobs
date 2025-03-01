@@ -89,7 +89,7 @@ class AIAnalyzer():
                 print(f"响应格式错误: {str(e)}")
                 break
             except TimeoutError as e:
-                print(f"连接超时 ({attempt+1}/5): {str(e)}")
+                print(f"AI连接超时 ({attempt+1}/5): {str(e)}")
                 await asyncio.sleep(2 ** attempt)
             #部分平台的ai响应存在截断，导致响应体不能被解析成json
             except Exception as e:

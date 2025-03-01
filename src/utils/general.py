@@ -150,7 +150,7 @@ def init_driver(webdriverConfig):
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
-    
+    #options.add_argument('--log-level=3')  # 只记录严重错误
     # Edge需要特殊处理日志设置
     if browser_type == "edge":
         options.set_capability('ms:loggingPrefs', {'performance': 'OFF'})

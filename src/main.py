@@ -1,5 +1,6 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
+from selenium.common.exceptions import TimeoutException 
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 import time
@@ -59,11 +60,14 @@ def main_loop(driver, config):
 
             driver.get(targetUrl)            
             while True:
-                # 等待页面加载
-                WebDriverWait(driver, page_load_timeout).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
-                )
-                
+                try:
+                    # 等待页面加载
+                    WebDriverWait(driver, page_load_timeout).until(
+                        EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
+                    )
+                except TimeoutException:
+                    print("获取页面职位超时，可能无岗位或被封禁")
+                    break
                 # 获取并过滤当前页职位
                 jobs = getPageJobsInfo(driver)
                 valid_jobs = filterJobsBySalary(jobs, minSalary)
