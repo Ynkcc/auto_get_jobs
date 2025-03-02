@@ -1,0 +1,32 @@
+name: Sync to Gitee
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]  # 同步标签推送
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  mirror-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # 超时设置
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # 使用最新稳定版本
+        with:
+          fetch-depth: 0  # 获取完整提交历史
+
+      - name: Mirror to Gitee
+        uses: Yikun/hub-mirror-action@v1.5  # 使用固定版本
+        with:
+          src: github/${{ github.repository_owner }}  # 自动获取当前仓库所属账号
+          dst: gitee/fang-actively  # 替换为你的Gitee用户名
+          dst_key: ${{ secrets.GITEE_SSH_KEY }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          static_list: "${{ github.event.repository.name }}"  # 自动同步当前仓库
+          force_update: true
+          debug: false  # 生产环境关闭调试
+          timeout: "600s"  # 单仓库超时时间
+          retries: 3  # 失败重试次数
+          retry_wait: 10s  # 重试间隔
