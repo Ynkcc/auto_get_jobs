@@ -25,11 +25,13 @@ def login(driver,account):
     #加载cookies
     if manager.load():
         driver.refresh()
-
-    WebDriverWait(driver, timeout="600").until(
-            EC.presence_of_element_located((By.XPATH, '//a[@ka="header-username"]'))
-        )
-
+    try:
+        WebDriverWait(driver, timeout="600").until(
+                EC.presence_of_element_located((By.XPATH, '//a[@ka="header-username"]'))
+            )
+    except TimeoutException:
+        driver.quit()
+        print("登录超时，程序自动退出")
     manager.start_autosave()
     print(f"登陆成功。")
     return manager

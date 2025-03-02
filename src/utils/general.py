@@ -162,6 +162,24 @@ def init_driver(webdriverConfig):
         options.add_argument("--headless=new")  # 新版推荐写法
         options.add_argument("window-size=1920,1080")
 
+    # 配置 user-data-dir
+    if webdriverConfig.get("use_default_data_dir",False):
+        if browser_type == "edge":
+            # Edge默认用户数据目录
+            edge_data_dir = os.path.join(os.environ['USERPROFILE'], 
+                                    'AppData', 'Local',
+                                    'Microsoft', 'Edge', 'User Data')
+            options.add_argument(f"user-data-dir={edge_data_dir}")
+            print(f"Edge用户数据目录设置为: {edge_data_dir}")
+        else:
+            # Chrome默认用户数据目录
+            chrome_data_dir = os.path.join(os.environ['USERPROFILE'],
+                                        'AppData', 'Local',
+                                        'Google', 'Chrome', 'User Data')
+            options.add_argument(f"user-data-dir={chrome_data_dir}")
+            print(f"Chrome用户数据目录设置为: {chrome_data_dir}")
+
+
     # 初始化浏览器驱动
     if browser_type == "edge":
         driver = webdriver.Edge(

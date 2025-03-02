@@ -7,6 +7,7 @@ crawler:
     chrome_driver_path: "driver/chromedriver.exe"  # 原路径改为配置项
     edge_driver_path: "driver/msedgedriver.exe"  # 新增Edge驱动路径
     headless: false
+    use_default_data_dir: false #使用默认的用户配置文件目录，不建议非开发者打开
   rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
     rate: 0.2  # 每秒生成的令牌数
     capacity: 3  # 桶的容量
