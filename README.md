@@ -43,5 +43,9 @@
 - [ ] selenium反反爬
 - [ ] 到达投递上限后自动切号
 
+#### 进行中
+- 实现一个MQTT客户端，参考[xmiaoq/bossbot](https://github.com/xmiaoq/bossbot)实现
+
+
 ## LICENSE
 [GNU General Public License v3.0](./LICENSE)
