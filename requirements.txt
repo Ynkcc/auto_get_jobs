@@ -8,3 +8,4 @@ Requests
 selenium
 sqlalchemy
 pyyaml
+openpyxl

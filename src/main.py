@@ -4,6 +4,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 import time
+import sys
 from multiprocessing import Process, Queue, Event
 from utils.general import *
 from utils.db_utils import DatabaseManager
@@ -32,6 +33,7 @@ def login(driver,account):
     except TimeoutException:
         driver.quit()
         print("登录超时，程序自动退出")
+        sys.exit(1)
     manager.start_autosave()
     print(f"登陆成功。")
     return manager
