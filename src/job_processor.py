@@ -19,9 +19,10 @@ from multiprocessing import Process, Queue, Event
 import aiohttp
 from utils.async_utils import *
 from utils.general import parseParams
+from ws_client.ws_client import WSclient
 
 class JobProcessor:
-    def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config):
+    def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config,resume_image_dict):
         self.comm_queue = comm_queue
         self.recv_queue = recv_queue
         self.done_event = done_event
@@ -32,6 +33,7 @@ class JobProcessor:
         self.rate_limit = TokenBucket(rate=self.crawler["rate_limit"]["rate"], capacity=self.crawler["rate_limit"]["capacity"])
 
         self.inactive_keywords = config["job_check"]["inactive_status"]
+        self.resume_image_dict=resume_image_dict
 
 
     async def _original_process_single_job(self, job_data, cookies, headers):
@@ -80,6 +82,9 @@ class JobProcessor:
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
                 apply_result  = await startChat(security_id, job_id, lid, cookies, headers)
+                #还可以放入自定义信息
+                if self.resume_image_dict:
+                    self.ws_queue.put(("image",card["encryptUserId"],""))
                 print(f"job {job_data['job_name']}: {apply_result ['message']}\n{job_requirements}\n\n")
             else:
                 print(f"job {job_data['job_name']}: ai认为不匹配\n{job_requirements}\n\n")
@@ -114,6 +119,8 @@ class JobProcessor:
 
     def start_processing(self):
         self.loop = asyncio.new_event_loop()
+        self.ws_queue = Queue()
+        self.ws_running_event = threading.Event()
         asyncio.set_event_loop(self.loop)
         
         while True:
@@ -127,6 +134,17 @@ class JobProcessor:
             headers = batch.get("headers")
             jobs_batch = batch.get("jobs")
 
+            # 初始化WebSocket客户端
+            self.ws_client = WSclient(
+                recv_queue=self.ws_queue,
+                running_event=self.ws_running_event,
+                image_dict=self.resume_image_dict,
+                headers=headers,
+                cookies=cookies
+            )
+            
+            self.ws_client.start()
+
             try:
                 results = self.loop.run_until_complete(
                     asyncio.wait_for(
@@ -139,5 +157,6 @@ class JobProcessor:
                 print("Batch processing timed out after 600 seconds")
                 results = []  # 超时后的处理逻辑
             results = [result for result in results if result is not None]
+            self.ws_running_event.clear()
             self.recv_queue.put(results)
             self.done_event.set()  # 通知主进程处理完成

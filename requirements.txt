@@ -9,3 +9,5 @@ selenium
 sqlalchemy
 pyyaml
 openpyxl
+paho-mqtt
+protobuf

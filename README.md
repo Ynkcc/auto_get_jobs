@@ -7,7 +7,7 @@
 - [lastsunday/job-hunting](https://github.com/lastsunday/job-hunting) 浏览器插件，多平台
 - [Ocyss/boos-helper](https://github.com/Ocyss/boos-helper) 浏览器插件
 - [IceyOrange/AutoBOSS](https://github.com/IceyOrange/AutoBOSS)  Python项目 
-- [Frrrrrrrrank/auto_job__find__chatgpt__rpa](https://github.com/Frrrrrrrrank/auto_job__find__chatgpt__rpa) Python项目
+- [rebibabo/Job-Hunting-Agent](https://github.com/rebibabo/Job-Hunting-Agent) Python项目
 
 本项目fork自 [SanThousand/auto_get_jobs](https://github.com/SanThousand/auto_get_jobs)
 ## 项目简介
@@ -35,7 +35,6 @@
 - [ ] 规范变量命名，全部改成下划线命名格式
 - [ ] 识别公司是不是外包，查询社保人数等
 - [ ] ai生成招呼语
-- [ ] 发送自定义招呼语，发送图片简历（暂时没抓到接口，而且不想用模拟点击的方式完成）
 - [ ] 配置文件包含用户对工作岗位的具体需求，传给ai更多信息
 - [ ] 让ai生成搜索关键词
 - [ ] 完善一下文档

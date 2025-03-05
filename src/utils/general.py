@@ -15,6 +15,7 @@ import random
 from multiprocessing import Process, Queue, Event
 import requests
 import yaml
+import hashlib
 
 
 
@@ -431,3 +432,52 @@ def getUserInfo(driver):
 def load_config(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
+
+
+def calculate_md5(filepath):
+    """计算文件的 MD5 哈希值"""
+    hash_md5 = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def upload_image(driver, filepath):
+
+    cookies = driver.get_cookies()
+    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+    headers = {
+        'User-Agent': driver.execute_script("return navigator.userAgent;")
+    }
+
+    # #快速上传接口（若服务端已有相同文件则直接返回结果）
+    # url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
+    # data = {
+    #     #securityId 缺少该参数，zpData必然为null
+    #     "fileMd5": file_md5,
+    #     "fileSize": file_size
+    # }
+    try:
+        url = "https://www.zhipin.com/wapi/zpupload/image/uploadSingle"
+
+        with open(filepath, "rb") as f:
+            files = {"file": (os.path.basename(filepath), f, "image/jpeg")}
+
+            
+            response = requests.post(
+                url,
+                headers=headers,
+                cookies=cookies_dict,
+                files=files
+            )
+        zpData=response.json()["zpData"]
+        result={
+            "url":zpData['url'],
+            "width": zpData["metadata"]["width"],
+            "height": zpData["metadata"]['height']
+        }
+        return result
+    except Exception as e:
+        print("上传简历图片出现错误")
+        return None

@@ -6,7 +6,7 @@ from PIL import Image
 """
 
 # 转换PDF为图片对象列表
-images = convert_from_path("resume.pdf")
+images = convert_from_path("resume.pdf",poppler_path=r"C:\Users\Lenovo\Desktop\poppler-24.08.0\Library\bin")
 
 # 计算总高度和最大宽度
 total_height = sum(img.height for img in images)

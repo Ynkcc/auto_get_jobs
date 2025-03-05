@@ -9,7 +9,7 @@ crawler:
     headless: false
     use_default_data_dir: false #使用默认的用户配置文件目录，不建议非开发者打开
   rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
-    rate: 0.2  # 每秒生成的令牌数
+    rate: 0.5  # 每秒生成的令牌数
     capacity: 3  # 桶的容量
   next_page_delay: 5 # 翻页延迟（秒）
   request_timeout: 30 # 请求超时时间（秒）
@@ -26,11 +26,13 @@ ai:
     帮助用户判断这个岗位是否合适
     岗位应与用户简历提供的方向一致
     输出严格遵循以下规则：只返回"true"或"false"
-  resume_for_ai_file: "user_requirements.md"  # 用户简历文件路径
+  resume_for_ai_file: "data/resume_for_ai.md"  # 用户简历文件路径
 
 # =============== 申请配置 ===============
-# 未实现
 application:
+  send_resume_image: false
+  resume_image_file: "data/resume.jpg"
+  # 未实现
   greeting: 
     enable_ai: false  # 是否使用AI生成招呼语
     template: |

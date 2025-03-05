@@ -152,3 +152,63 @@ async def startChat(securityId, jobId, lid, cookies=None, headers=None):
                 return await response.json()
             else:
                 response.raise_for_status()
+
+# 以下接口待验证
+# async def get_boss_list(page: int, cookies=None, headers=None):
+#     path = "/wapi/zprelation/friend/getGeekFriendList.json"
+#     url = f"https://www.zhipin.com{path}"
+#     params = {"page": page}
+    
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url, params=params, cookies=cookies, headers=headers) as response:
+#             return await response.json()
+
+# async def get_boss_data(encryptBossId: str, securityId: str, source_type="0", cookies=None, headers=None):
+#     path = "/wapi/zpgeek/chat/bossdata.json"
+#     url = f"https://www.zhipin.com{path}"
+#     params = {
+#         "bossId": encryptBossId,
+#         "bossSource": source_type,
+#         "securityId": securityId
+#     }
+    
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url, params=params, cookies=cookies, headers=headers) as response:
+#             return await response.json()
+
+# async def get_history_msg(encryptBossId: str, securityId: str, cookies=None, headers=None):
+#     path = "/wapi/zpchat/geek/historyMsg"
+#     url = f"https://www.zhipin.com{path}"
+#     params = {
+#         "bossId": encryptBossId,
+#         "groupId": encryptBossId,
+#         "securityId": securityId,
+#         "maxMsgId": "0",
+#         "c": "20",
+#         "page": "1"
+#     }
+    
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url, params=params, cookies=cookies, headers=headers) as response:
+#             return await response.json()
+
+# async def request_send_resume(bossId: str, resumeId: str, cookies=None, headers=None):
+#     path = "/geek/new/requestSendResume.json"
+#     url = f"https://www.zhipin.com{path}"
+#     params = {
+#         "bossId": bossId,
+#         "resumeId": resumeId,
+#         "toSource": "0"
+#     }
+    
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url, params=params, cookies=cookies, headers=headers) as response:
+#             return await response.json()
+
+# async def get_resumes(cookies=None, headers=None):
+#     path = "/wapi/zpgeek/resume/attachment/checkbox.json"
+#     url = f"https://www.zhipin.com{path}"
+    
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url, cookies=cookies, headers=headers) as response:
+#             return await response.json()

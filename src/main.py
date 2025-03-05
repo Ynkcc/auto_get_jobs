@@ -47,13 +47,18 @@ def main_loop(driver, config):
     page_load_timeout=crawler_config.get("page_load_timeout", 60)
     next_page_delay=crawler_config.get("next_page_delay", 5)
     minSalary,_ = config["job_check"]["salary_range"]
-
+    send_resume_image = config['application']["send_resume_image"]
+    resume_image_file = config['application']["resume_image_file"]
+    resume_image_dict=None
+    if send_resume_image and os.path.exists(resume_image_file):
+        resume_image_dict=upload_image(driver,resume_image_file)
+    
     userId, _ =getUserInfo(driver)
     db_manager = DatabaseManager(databaseFileName,userId)
     recv_queue = Queue()
     comm_queue = Queue()
     done_event = Event()
-    processor = JobProcessor(comm_queue,recv_queue,done_event,config)  # 传入db_queue
+    processor = JobProcessor(comm_queue,recv_queue,done_event,config,resume_image_dict)  # 传入db_queue
     
     # 启动处理进程
     process = Process(target=processor.start_processing)
