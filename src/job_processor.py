@@ -121,6 +121,7 @@ class JobProcessor:
         self.loop = asyncio.new_event_loop()
         self.ws_queue = Queue()
         self.ws_running_event = threading.Event()
+        self.ws_client = None
         asyncio.set_event_loop(self.loop)
         
         while True:
@@ -135,15 +136,16 @@ class JobProcessor:
             jobs_batch = batch.get("jobs")
 
             # 初始化WebSocket客户端
-            self.ws_client = WSclient(
-                recv_queue=self.ws_queue,
-                running_event=self.ws_running_event,
-                image_dict=self.resume_image_dict,
-                headers=headers,
-                cookies=cookies
-            )
-            
-            self.ws_client.start()
+            if not self.ws_client:
+                self.ws_client = WSclient(
+                    recv_queue=self.ws_queue,
+                    running_event=self.ws_running_event,
+                    image_dict=self.resume_image_dict,
+                    headers=headers,
+                    cookies=cookies
+                )
+                
+                self.ws_client.start()
 
             try:
                 results = self.loop.run_until_complete(
@@ -157,6 +159,5 @@ class JobProcessor:
                 print("Batch processing timed out after 600 seconds")
                 results = []  # 超时后的处理逻辑
             results = [result for result in results if result is not None]
-            self.ws_running_event.clear()
             self.recv_queue.put(results)
             self.done_event.set()  # 通知主进程处理完成

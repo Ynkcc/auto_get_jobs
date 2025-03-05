@@ -205,6 +205,7 @@ class WSclient(threading.Thread):
                 task = self.recv_queue.get(timeout=1)
                 if task:
                     self.send_message(task)
+                    time.sleep(2)
             except queue.Empty:
                 continue
             except Exception as e:
@@ -301,3 +302,49 @@ class WSclient(threading.Thread):
     def on_application_result(self, job_id, result):
         """职位申请结果回调（需子类实现）"""
         pass
+
+if __name__ == "__main__":
+    # 测试用参数
+    test_queue = queue.Queue()
+    test_event = threading.Event()
+    test_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}
+    with open("data/account1.json","r",encoding="utf8") as f:
+        cookies = json.load(f)["cookies"]
+    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+    test_logger = logging.getLogger("ws_client")
+    test_logger.setLevel(logging.DEBUG)  # 设置最低记录级别
+
+    # 创建 Handler（控制台 + 文件）
+    console_handler = logging.StreamHandler()
+
+    # 设置 Handler 级别
+    console_handler.setLevel(logging.DEBUG)  # 控制台只记录 WARNING 及以上
+
+    # 定义日志格式
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    console_handler.setFormatter(formatter)
+
+    # 将 Handler 添加到 Logger
+    test_logger.addHandler(console_handler)
+    image_dict={
+                "url": "https://img.bosszhipin.com/beijin/upload/tmp/20250305/8f00b204e98009986ff8e7a2df03c5c14b1b103c92129ecfd6fdbaaac6966d6a8ef5e5092165499b.png",
+                "width": 1700,
+                "height": 2200
+    }
+    client = WSclient(
+        recv_queue=test_queue,
+        running_event=test_event,
+        image_dict=image_dict,
+        headers=test_headers,
+        cookies=cookies_dict,
+        logger=test_logger
+    )
+    
+
+    test_event.set()
+    client.start()
+    test_queue.put(("image","3aa60c387c96fc671X172d66GFM~",""))
+    input("按下任意键，退出")
