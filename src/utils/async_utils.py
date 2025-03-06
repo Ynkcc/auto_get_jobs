@@ -55,7 +55,8 @@ class AIAnalyzer():
                         "messages": [
                             {"role": "system", "content": self.ai_prompt},
                             {"role": "user", "content": f"岗位要求：{job_detail}\
-                                \n用户简历/要求：{self.resume_for_ai}"}
+                                \n用户简历、要求： {self.resume_for_ai}"},
+                            #{"role":"user","content":self.ai_prompt}
                         ],
                         "temperature": self.temperature,
                         #"max_tokens": 50 DeepSeek-R1包含思考过程，max_tokens太低会使回答不完整

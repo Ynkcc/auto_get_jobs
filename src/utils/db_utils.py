@@ -189,7 +189,13 @@ class DatabaseManager:
             return job.visited if job else False
         finally:
             session.close()
-
+    def check_visited(self, job_id,user_id:str):
+        session = self.Session()
+        try:
+            job = session.query(JobDetail).get(job_id)
+            return (job.visited if job else False) and (str(user_id) in job.applied_account)
+        finally:
+            session.close()
     def filterVisited(self,jobs):
         filteredJobs=[]
         for job in jobs:
@@ -198,6 +204,18 @@ class DatabaseManager:
             checkResult=self.check_visited(job_id)
             if checkResult:
                 print(f"已经访问过 招聘岗位: {job_name}")
+            else:
+                filteredJobs.append(job)
+        return filteredJobs
+
+    def filterVisited(self,jobs,user_id):
+        filteredJobs=[]
+        for job in jobs:
+            job_name = job['job_name']
+            job_id = self.parseParams(job["job_link"])[0]
+            checkResult=self.check_visited(job_id,user_id)
+            if checkResult:
+                print(f"该账号已经访问过 招聘岗位: {job_name}")
             else:
                 filteredJobs.append(job)
         return filteredJobs

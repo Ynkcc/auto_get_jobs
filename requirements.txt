@@ -10,4 +10,4 @@ sqlalchemy
 pyyaml
 openpyxl
 paho-mqtt
-protobuf
+protobuf==5.29.3

@@ -81,7 +81,7 @@ def main_loop(driver, config):
                 jobs = getPageJobsInfo(driver)
                 valid_jobs = filterJobsBySalary(jobs, minSalary)
                 #过滤访问过的
-                valid_jobs = db_manager.filterVisited(valid_jobs)
+                valid_jobs = db_manager.filterVisited(valid_jobs,userId)
                 jobsDetails=None
                 if valid_jobs:
 

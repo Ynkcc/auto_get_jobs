@@ -20,6 +20,7 @@ import aiohttp
 from utils.async_utils import *
 from utils.general import parseParams
 from ws_client.ws_client import WSclient
+import queue
 
 class JobProcessor:
     def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config,resume_image_dict):
@@ -64,6 +65,7 @@ class JobProcessor:
             # 构建岗位要求
             card = job_detail['zpData']['jobCard']
             job_requirements = (
+                f"公司名称：{card["brandName"]}\n"
                 f"职位名称：{card['jobName']}\n"
                 f"岗位职责：{card['postDescription']}\n"
                 f"经验要求：{card['experienceName']}\n"
@@ -119,8 +121,9 @@ class JobProcessor:
 
     def start_processing(self):
         self.loop = asyncio.new_event_loop()
-        self.ws_queue = Queue()
+        self.ws_queue = queue.Queue()
         self.ws_running_event = threading.Event()
+        self.ws_client = None
         asyncio.set_event_loop(self.loop)
         
         while True:
@@ -135,15 +138,16 @@ class JobProcessor:
             jobs_batch = batch.get("jobs")
 
             # 初始化WebSocket客户端
-            self.ws_client = WSclient(
-                recv_queue=self.ws_queue,
-                running_event=self.ws_running_event,
-                image_dict=self.resume_image_dict,
-                headers=headers,
-                cookies=cookies
-            )
-            
-            self.ws_client.start()
+            if not self.ws_client:
+                self.ws_client = WSclient(
+                    recv_queue=self.ws_queue,
+                    running_event=self.ws_running_event,
+                    image_dict=self.resume_image_dict,
+                    headers=headers,
+                    cookies=cookies
+                )
+                
+                self.ws_client.start()
 
             try:
                 results = self.loop.run_until_complete(
@@ -157,6 +161,5 @@ class JobProcessor:
                 print("Batch processing timed out after 600 seconds")
                 results = []  # 超时后的处理逻辑
             results = [result for result in results if result is not None]
-            self.ws_running_event.clear()
             self.recv_queue.put(results)
             self.done_event.set()  # 通知主进程处理完成
