@@ -20,6 +20,7 @@ import aiohttp
 from utils.async_utils import *
 from utils.general import parseParams
 from ws_client.ws_client import WSclient
+import queue
 
 class JobProcessor:
     def __init__(self, comm_queue: Queue,recv_queue: Queue, done_event,config,resume_image_dict):
@@ -64,6 +65,7 @@ class JobProcessor:
             # 构建岗位要求
             card = job_detail['zpData']['jobCard']
             job_requirements = (
+                f"公司名称：{card["brandName"]}\n"
                 f"职位名称：{card['jobName']}\n"
                 f"岗位职责：{card['postDescription']}\n"
                 f"经验要求：{card['experienceName']}\n"
@@ -119,7 +121,7 @@ class JobProcessor:
 
     def start_processing(self):
         self.loop = asyncio.new_event_loop()
-        self.ws_queue = Queue()
+        self.ws_queue = queue.Queue()
         self.ws_running_event = threading.Event()
         self.ws_client = None
         asyncio.set_event_loop(self.loop)

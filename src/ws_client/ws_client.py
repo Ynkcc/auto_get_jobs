@@ -196,7 +196,7 @@ class WSclient(threading.Thread):
         self.client.username_pw_set(self.token+"|0", self.wt2)
 
         # 建立连接
-        self.client.connect(self.hostname, self.port, keepalive=25)
+        self.client.connect(self.hostname, self.port, keepalive=15)
         self.client.loop_start()
         self._running.set()
         # 任务处理循环
