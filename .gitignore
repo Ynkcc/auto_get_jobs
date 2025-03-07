@@ -3,3 +3,4 @@ driver/*.exe
 config/config.yaml
 data/*
 src/ws_client/protoc.exe
+*.log

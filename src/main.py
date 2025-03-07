@@ -1,16 +1,53 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.common.exceptions import TimeoutException 
-from selenium.webdriver.support import expected_conditions as EC
-from dotenv import load_dotenv
-import time
+from utils.config_manager import ConfigManager
+import logging
+from logging.handlers import RotatingFileHandler
+
+# 加载配置
+ConfigManager.load_config("config/config.yaml")
+config = ConfigManager.get_config()
+
+# 配置日志
+logging_config = config.logging
+# 修改 main.py 中的 setup_logging 函数
+def setup_logging(logging_config):
+    """
+    配置日志系统
+    """
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging_config.level)
+    console_handler.setFormatter(formatter)
+
+    # 文件处理器（使用 RotatingFileHandler 替代 FileHandler）
+    file_handler = RotatingFileHandler(
+        filename=logging_config.path,
+        mode='a',
+        maxBytes=logging_config.max_size * 1024 * 1024,  # 转换为字节
+        backupCount=5  # 保持5个备份文件
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    # 获取根日志器并配置
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
+
+setup_logging(logging_config)
+logger = logging.getLogger(__name__)
+logger.info("test")
+
+from selenium.common.exceptions import TimeoutException
 import sys
-from multiprocessing import Process, Queue, Event
 from utils.general import *
 from utils.db_utils import DatabaseManager
 from job_processor import JobProcessor
 
-def login(driver,account):
+def login(driver, account):
     """
     登录BOSS直聘
     """
@@ -38,17 +75,16 @@ def login(driver,account):
     print(f"登陆成功。")
     return manager
 
-def main_loop(driver, config):
+def main(driver, config):
+    # 初始化WebDriver
+    driver = init_driver(config.crawler.webdriver)
 
-    # 从配置中获取参数
-    databaseFileName = config['database']['filename']
-    job_search =config['job_search']
-    crawler_config = config['crawler']
-    page_load_timeout=crawler_config.get("page_load_timeout", 60)
-    next_page_delay=crawler_config.get("next_page_delay", 5)
-    minSalary,_ = config["job_check"]["salary_range"]
-    send_resume_image = config['application']["send_resume_image"]
-    resume_image_file = config['application']["resume_image_file"]
+    for account in config.accounts:
+        manager = login(driver, account)
+        main_loop(driver, config)
+        manager.stop_autosave()
+        manager.clear_data()
+
     resume_image_dict=None
     if send_resume_image and os.path.exists(resume_image_file):
         resume_image_dict=upload_image(driver,resume_image_file)
@@ -119,16 +155,5 @@ def main_loop(driver, config):
         comm_queue.put(None)
         process.join(timeout=30)
 
-
-def main():
-    config=load_config("config/config.yaml")
-    driver=init_driver(config['crawler']["webdriver"])
-    for account in config['accounts']:
-        manager=login(driver,account)
-        main_loop(driver,config)
-        manager.stop_autosave()
-        manager.clear_data()
-
-
-if __name__=="__main__":
+if __name__=='__main__':
     main()

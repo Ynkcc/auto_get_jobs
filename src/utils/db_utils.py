@@ -1,12 +1,13 @@
 # database_utils.py
-from sqlalchemy import create_engine, Column, String, Text, Boolean, DateTime, inspect,DDL
+import logging
+logger = logging.getLogger(__name__)
+from sqlalchemy import create_engine, Column, String, Text, Boolean, DateTime, inspect, DDL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import json
 from typing import List, Optional, Dict, Any
 import re
-
 
 Base = declarative_base()
 
@@ -42,7 +43,7 @@ class JobDetail(Base):
     bossName = Column(String(64))
     bossTitle = Column(String(64))
     bossAvatar = Column(String(256))
-    activeTimeDesc = Column(String(64),default="")
+    activeTimeDesc = Column(String(64), default="")
     
     # 系统状态字段
     visited = Column(Boolean, default=False)
@@ -99,7 +100,7 @@ class DatabaseManager:
                         card = detail.get('job_data', {}).get('zpData', {}).get('jobCard')
                         eid = card.get('encryptJobId')
                     except:
-                        print(f'{detail["job_id"]},不含详细信息')
+                        logger.error(f'{detail["job_id"]},不含详细信息')
                         continue
                     
                     # 记录已处理ID
@@ -203,7 +204,7 @@ class DatabaseManager:
             job_id = self.parseParams(job["job_link"])[0]
             checkResult=self.check_visited(job_id)
             if checkResult:
-                print(f"已经访问过 招聘岗位: {job_name}")
+                logger.info(f"已经访问过 招聘岗位: {job_name}")
             else:
                 filteredJobs.append(job)
         return filteredJobs
@@ -215,7 +216,7 @@ class DatabaseManager:
             job_id = self.parseParams(job["job_link"])[0]
             checkResult=self.check_visited(job_id,user_id)
             if checkResult:
-                print(f"该账号已经访问过 招聘岗位: {job_name}")
+                logger.info(f"该账号已经访问过 招聘岗位: {job_name}")
             else:
                 filteredJobs.append(job)
         return filteredJobs
