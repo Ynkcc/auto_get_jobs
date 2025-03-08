@@ -55,11 +55,11 @@ class JobDetail(Base):
 class DatabaseManager:
     """数据库管理类，提供优化的CRUD操作"""
     
-    def __init__(self, db_path: str, userId: str):
+    def __init__(self, db_path: str):
         self.engine = create_engine(f'sqlite:///{db_path}', pool_pre_ping=True)
         self._create_tables()
         self.Session = sessionmaker(bind=self.engine)
-        self.userId = userId
+        self.userId = None
 
     def _create_tables(self):
         """确保表结构存在并自动添加新增列"""

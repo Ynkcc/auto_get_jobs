@@ -128,27 +128,26 @@ class BrowserSessionHandler:
             return False
 
 
-def init_driver(webdriver_config: Dict) -> webdriver:
+def init_driver(webdriver_config) -> webdriver:
     """
     初始化 WebDriver
-    :param webdriver_config: WebDriver 配置
+    :param webdriver_config: WebDriver配置对象
     :return: WebDriver 实例
     """
-    browser_type = webdriver_config.get("browser_type", "chrome").lower()
+    browser_type = webdriver_config.browser_type.lower()
 
     if browser_type == "edge":
         from selenium.webdriver.edge.options import Options as EdgeOptions
         from selenium.webdriver.edge.service import Service as EdgeService
-
+        
         options = EdgeOptions()
-        driver_path = os.path.join(webdriver_config.get("edge_driver_path", "driver/msedgedriver.exe"))
+        driver_path = webdriver_config.edge_driver_path
         ServiceClass = EdgeService
     else:  # 默认使用 Chrome
         from selenium.webdriver.chrome.options import Options as ChromeOptions
         from selenium.webdriver.chrome.service import Service as ChromeService
-
         options = ChromeOptions()
-        driver_path = os.path.join(webdriver_config.get("chrome_driver_path", "driver/chromedriver.exe"))
+        driver_path = webdriver_config.chrome_driver_path
         ServiceClass = ChromeService
 
     # 公共配置项
@@ -158,70 +157,39 @@ def init_driver(webdriver_config: Dict) -> webdriver:
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
     options.add_argument('--log-level=3')  # 只记录严重错误
 
-    # Edge 需要特殊处理日志设置
+    # 浏览器特定配置
+    log_prefs = {'performance': 'OFF'}
     if browser_type == "edge":
-        options.set_capability('ms:loggingPrefs', {'performance': 'OFF'})
+        options.set_capability('ms:loggingPrefs', log_prefs)
     else:
-        options.set_capability('goog:loggingPrefs', {'performance': 'OFF'})
+        options.set_capability('goog:loggingPrefs', log_prefs)
 
     # 无头模式配置
-    if webdriver_config.get("headless", False):
-        options.add_argument("--headless=new")  # 新版推荐写法
+    if webdriver_config.headless:
+        options.add_argument("--headless=new")
         options.add_argument("window-size=1920,1080")
 
-    # 配置 user-data-dir
-    if webdriver_config.get("use_default_data_dir", False):
-        if browser_type == "edge":
-            edge_data_dir = os.path.join(os.environ['USERPROFILE'],
-                                         'AppData', 'Local',
-                                         'Microsoft', 'Edge', 'User Data')
-            options.add_argument(f"user-data-dir={edge_data_dir}")
-            logger.info(f"Edge 用户数据目录设置为: {edge_data_dir}")
-        else:
-            chrome_data_dir = os.path.join(os.environ['USERPROFILE'],
-                                           'AppData', 'Local',
-                                           'Google', 'Chrome', 'User Data')
-            options.add_argument(f"user-data-dir={chrome_data_dir}")
-            logger.info(f"Chrome 用户数据目录设置为: {chrome_data_dir}")
-
-    # 初始化浏览器驱动
-    if browser_type == "edge":
-        driver = webdriver.Edge(
-            service=ServiceClass(executable_path=driver_path),
-            options=options
+    # 用户数据目录配置
+    if webdriver_config.use_default_data_dir:
+        data_dir = (
+            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data')
+            if browser_type == "edge"
+            else os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data')
         )
-    else:
-        driver = webdriver.Chrome(
-            service=ServiceClass(executable_path=driver_path),
-            options=options
-        )
+        options.add_argument(f"user-data-dir={data_dir}")
+        logger.info(f"{browser_type.capitalize()} 用户数据目录设置为: {data_dir}")
 
-    return driver
-
-
-def wait_for_redirect(driver, timeout=60):
-    """
-    等待页面跳转到指定 URL
-    """
+    # 初始化浏览器实例
     try:
-        WebDriverWait(driver, timeout).until(
-            lambda d: d.current_url == "https://www.zhipin.com/web/geek/job-recommend" or
-                      d.current_url == "https://www.zhipin.com"
+        driver = (
+            webdriver.Edge(service=ServiceClass(executable_path=driver_path), options=options)
+            if browser_type == "edge"
+            else webdriver.Chrome(service=ServiceClass(executable_path=driver_path), options=options)
         )
-        print("页面跳转成功。")
+        return driver
     except Exception as e:
-        print(f"页面跳转失败: {e}")
-
-
-def get_cityid(city):
-    """
-    获取城市的ID
-    """
-    cityid_dict = json.load(open("city_list.json", "r", encoding="utf-8"))
-    cityid = cityid_dict[city]
-
-    return cityid
-
+        logger.error(f"浏览器初始化失败: {str(e)}")
+        raise
 
 def build_search_url(job_search):
     """
@@ -236,37 +204,39 @@ def build_search_url(job_search):
     city_code_map = params_data["cityCode"]
 
     # 处理区域配置
-    if job_search.get('areas'):
+    if job_search.areas:
         # 处理明确指定的区域
-        for city_name, districts in job_search['areas'].items():
+        for city_name, districts in job_search.areas.items():
             if city_name not in city_code_map:
-                print(f"警告：未找到城市 [{city_name}] 的编码，已跳过")
+                logger.warning(f"未找到城市 [{city_name}] 的编码，已跳过")
                 continue
 
             city_entry = city_code_map[city_name]
             city_code = list(city_entry.keys())[0]  # 获取城市编码
 
-            valid_districts = []
-            for district in districts:
-                if district in city_entry[city_code]:
-                    valid_districts.append(city_entry[city_code][district])
-                else:
-                    print(f"警告：城市 [{city_name}] 下未找到区域 [{district}]")
+            valid_districts = [
+                city_entry[city_code][district]
+                for district in districts
+                if district in city_entry[city_code]
+            ]
+            
+            # 过滤无效区域
+            invalid = set(districts) - set(city_entry[city_code].keys())
+            if invalid:
+                logger.warning(f"城市 [{city_name}] 下未找到区域: {', '.join(invalid)}")
 
             if valid_districts:
                 location_dicts.setdefault(city_code, []).extend(valid_districts)
     else:
         # 处理城市全集
-        for city_name in job_search.get('city', []):
+        for city_name in job_search.city:
             if city_name not in city_code_map:
-                print(f"警告：未找到城市 [{city_name}] 的编码，已跳过")
+                logger.warning(f"未找到城市 [{city_name}] 的编码，已跳过")
                 continue
 
             city_entry = city_code_map[city_name]
             city_code = list(city_entry.keys())[0]
-            # 获取该城市所有区域编码
-            all_districts = list(city_entry[city_code].values())
-            location_dicts[city_code] = all_districts
+            location_dicts[city_code] = list(city_entry[city_code].values())
 
     # 参数验证
     if not location_dicts:
@@ -276,51 +246,43 @@ def build_search_url(job_search):
 
     # 转换到具体代码
     params_config = {
-        'position': [str(params_data["position"][v]) for v in job_search.get("position", [])],
-        'industry': [str(params_data["industry"][v]) for v in job_search.get("industry", [])],
-        'experience': [str(params_data["experience"][v]) for v in job_search.get("experience", [])],
-        'salary': [str(params_data["salary"][v]) for v in job_search.get("salary", [])],
-        'jobType': [str(params_data["jobType"][v]) for v in job_search.get("jobType", [])],
-        'scale': [str(params_data["scale"][v]) for v in job_search.get("scale", [])],
-        'stage': [str(params_data["stage"][v]) for v in job_search.get("stage", [])],
-        'query': list(job_search.get('query', ''))  # 保持单值列表形式
+        'position': [str(params_data["position"][v]) for v in job_search.position],
+        'industry': [str(params_data["industry"][v]) for v in job_search.industry],
+        'experience': [str(params_data["experience"][v]) for v in job_search.experience],
+        'salary': [str(params_data["salary"][v]) for v in job_search.salary],
+        'jobType': [str(params_data["jobType"][v]) for v in job_search.jobType],
+        'scale': [str(params_data["scale"][v]) for v in job_search.scale],
+        'stage': [str(params_data["stage"][v]) for v in job_search.stage],
+        'query': job_search.query  # 直接使用列表
     }
 
+    # 过滤空参数
     params_config = {k: v for k, v in params_config.items() if v}
 
-    # 生成基础参数组合
-    param_combinations = []
+    # 生成参数组合
     for city_code, districts in location_dicts.items():
-        # 为每个城市生成区域组合
         for district in districts:
-
-            current_params = {}
-
-            current_params['city'] = city_code
-            current_params['areaBusiness'] = district
-
+            base_params = {'city': city_code, 'areaBusiness': district}
+            
             if not params_config:
                 yield f"{base_url}?city={city_code}&areaBusiness={district}"
                 continue
 
             # 递归生成参数组合
-            def param_generator(keys, values, index=0, current_params=None):
-                current_params = current_params.copy()
+            def generate_params(keys: List[str], values: List[List[str]], index: int = 0, current: dict = None):
+                current = current.copy() if current else base_params.copy()
                 if index == len(keys):
-                    param_str = '&'.join(f"{k}={v}" for k, v in sorted(current_params.items()))
+                    param_str = '&'.join(f"{k}={v}" for k, v in sorted(current.items()))
                     yield f"{base_url}?{param_str}"
-
                 else:
-                    key = keys[index]
                     for value in values[index]:
-                        current_params[key] = value
-                        yield from param_generator(keys, values, index + 1, current_params)
+                        current[keys[index]] = value
+                        yield from generate_params(keys, values, index + 1, current)
 
-            # 添加其他参数组合
-            parma_ksys = list(params_config.keys())
-            parma_values = list(params_config.values())
-            yield from param_generator(parma_ksys, parma_values, 0, current_params)
-
+            yield from generate_params(
+                keys=list(params_config.keys()),
+                values=list(params_config.values())
+            )
 
 def get_page_jobs_info(driver):
     jobs = []
@@ -415,15 +377,10 @@ def parse_params(link):
     return match.groups() if match else None
 
 
-def get_user_info(driver):
-    cookies = driver.get_cookies()
-    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-    headers = {
-        'User-Agent': driver.execute_script("return navigator.userAgent;")
-    }
+def get_user_info(cookies, headers):
     url = "https://www.zhipin.com/wapi/zpuser/wap/getUserInfo.json"
     try:
-        user_info = requests.get(url, cookies=cookies_dict, headers=headers).json()
+        user_info = requests.get(url, cookies=cookies, headers=headers).json()
         user_id = user_info['zpData']['userId']
         user_name = user_info['zpData']['name']
         true_man = user_info['zpData']['trueMan']
@@ -436,6 +393,26 @@ def get_user_info(driver):
         return "UNKNOWN", None
     return user_id, user_info
 
+def get_wt2(cookies,headers):
+    """获取wt2验证参数"""
+    try:
+        url = "https://www.zhipin.com/wapi/zppassport/get/wt"
+        response = requests.get(
+            url,
+            cookies=cookies,
+            headers=headers,
+            timeout=10
+        )
+        response.raise_for_status()
+        wt2_data = response.json()
+
+        if wt2_data['code'] == 0:
+            return wt2_data['zpData'].get('wt2')
+        raise Exception(f"获取wt2失败: {wt2_data.get('message')}")
+    except Exception as e:
+        self.logger.error(f"获取wt2异常: {str(e)}")
+        return None
+
 
 def calculate_md5(filepath):
     """计算文件的 MD5 哈希值"""
@@ -446,18 +423,10 @@ def calculate_md5(filepath):
     return hash_md5.hexdigest()
 
 
-def upload_image(driver, filepath):
+def upload_image(filepath,cookies,headers):
     """
     上传图片
-    :param driver: WebDriver 实例
-    :param filepath: 图片文件路径
-    :return: 上传结果
     """
-    cookies = driver.get_cookies()
-    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-    headers = {
-        'User-Agent': driver.execute_script("return navigator.userAgent;")
-    }
 
     # #快速上传接口（若服务端已有相同文件则直接返回结果）
     # url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
@@ -475,7 +444,7 @@ def upload_image(driver, filepath):
             response = requests.post(
                 url,
                 headers=headers,
-                cookies=cookies_dict,
+                cookies=cookies,
                 files=files
             )
         zp_data = response.json()["zpData"]
@@ -489,6 +458,15 @@ def upload_image(driver, filepath):
         logger.error("上传简历图片出现错误")
         return None
 
+def quickly_upload_image(filepath,securityId,cookies,headers):
+    #快速上传接口（若服务端已有相同文件则直接返回结果）
+    url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
+    data = {
+        "securityId": '',
+        "fileMd5": file_md5,
+        "fileSize": file_size
+    }
+    return None
 
 class TokenBucket:
     def __init__(self, rate: int, capacity: int):
@@ -512,8 +490,37 @@ class TokenBucket:
                 # 等待直到有令牌
                 await asyncio.sleep(1 / self.rate)
 
+class SessionManager:
+    _sync_session = requests.Session()
+    _async_session = None
+    _lock = threading.Lock()
 
-async def get_job_info(securityId, lid, cookies=None, headers=None):
+    @classmethod
+    def get_sync_session(cls):
+        return cls._sync_session
+
+    @classmethod
+    async def get_async_session(cls):
+        if cls._async_session is None or cls._async_session.closed:
+            async with cls._lock:
+                if cls._async_session is None or cls._async_session.closed:
+                    # 调整连接池参数
+                    connector = aiohttp.TCPConnector(
+                        limit=50,  # 增大连接池容量
+                        limit_per_host=20,  # 每个host最大连接数
+                        ssl=False
+                    )
+                    cls._async_session = aiohttp.ClientSession(
+                        connector=connector,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    )
+        return cls._async_session
+
+    @classmethod
+    async def close_async_session(cls):
+        if cls._async_session and not cls._async_session.closed:
+            await cls._async_session.close()
+async def get_job_info(securityId, lid, cookies=None, headers=None, max_retries=3):
     path = "/wapi/zpgeek/job/card.json"
     url = f"{BASE_URL}{path}"
     params = {
@@ -521,13 +528,37 @@ async def get_job_info(securityId, lid, cookies=None, headers=None):
         "lid": lid
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params, cookies=cookies, headers=headers, timeout=30) as response:
-            if response.status == 200:
-                return await response.json()
-            else:
-                response.raise_for_status()
+    async def _request(attempt):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=params,
+                    cookies=cookies,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30 + attempt*5)  # 动态超时
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    elif response.status == 403:
+                        logger.warning(f"[403 Forbidden] 可能触发反爬虫 securityId={securityId}")
+                        return None
+                    else:
+                        logger.error(f"请求失败 HTTP {response.status} - {await response.text()}")
+                        return None
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logger.warning(f"请求异常 [{type(e).__name__}] 第{attempt}次重试: {str(e)}")
+            return None
 
+    # 重试逻辑
+    for attempt in range(1, max_retries + 1):
+        result = await _request(attempt)
+        if result is not None:
+            return result
+        await asyncio.sleep(min(2 ** attempt, 10))  # 指数退避
+
+    logger.error(f"请求失败（已达最大重试次数 {max_retries}）")
+    return None
 
 async def start_chat(securityId, jobId, lid, cookies=None, headers=None):
     path = "/wapi/zpgeek/friend/add.json"

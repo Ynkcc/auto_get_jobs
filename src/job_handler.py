@@ -2,28 +2,33 @@ import logging
 logger = logging.getLogger(__name__)
 import traceback
 import asyncio
-from utils.async_utils import *
-from utils.general import parseParams
-from ws_client.ws_client import WSclient
+from utils.general import *
+from ws_client.ws_client import WsClient
 import queue
 from utils.config_manager import ConfigManager
+from utils.ai_analyzer import AiAnalyzer
+from utils.db_utils import DatabaseManager
 
-class JobProcessor:
-    def __init__(self, comm_queue: queue.Queue, recv_queue: queue.Queue, done_event, resume_image_dict):
-        self.comm_queue = comm_queue
-        self.recv_queue = recv_queue
+class JobHandler(threading.Thread):
+    def __init__(self, job_queue: queue.Queue, ws_queue: queue.Queue, done_event, running_event, ):
+        super().__init__(daemon=True)
+        self.job_queue = job_queue
+        self.ws_queue = ws_queue
         self.done_event = done_event
+        self.running_event = running_event
         self.loop = None
 
         config = ConfigManager.get_config()
-        self.ai_analyzer = AIAnalyzer(config.ai)
-        self.crawler = config.crawler
-        self.rate_limit = TokenBucket(rate=self.crawler.rate_limit["rate"], capacity=self.crawler.rate_limit["capacity"])
-
+        self.ai_analyzer = AiAnalyzer()
+        crawler_config = config.crawler
+        self.rate_limit = TokenBucket(rate=crawler_config.rate_limit["rate"], capacity=crawler_config.rate_limit["capacity"])
+        self.db_manager = DatabaseManager(config.database.filename)
         self.inactive_keywords = config.job_check.inactive_status
-        self.resume_image_dict = resume_image_dict
+        self.resume_image_enabled = config.application.send_resume_image
+        self.cookies= {}
+        self.headers = {}
 
-    async def _original_process_single_job(self, job_data, cookies, headers):
+    async def _original_process_single_job(self, job_data):
         result = {
             'job_id': None,
             'job_data': None,
@@ -33,13 +38,13 @@ class JobProcessor:
         }
         # 解析job_link中的参数
         link = job_data['job_link']
-        job_id, lid, security_id = parseParams(link)
+        job_id, lid, security_id = parse_params(link)
         result['job_id'] = job_id
         # 实际的请求处理逻辑
         try:
             # 获取职位详细信息（限速）
             await self.rate_limit.get_token()  # 限速调用
-            job_detail = await getJobInfo(security_id, lid, cookies, headers)
+            job_detail = await get_job_info(security_id, lid, self.cookies, self.headers)
             result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
@@ -58,7 +63,7 @@ class JobProcessor:
             )
 
             # 不限速调用
-            ai_result, ai_think = await self.ai_analyzer.aiHrCheck(job_requirements)
+            ai_result, ai_think = await self.ai_analyzer.ai_hr_check(job_requirements)
             result['analysis_result'] = ai_result
             if ai_think:
                 result['analysis_think'] = ai_think
@@ -67,10 +72,10 @@ class JobProcessor:
             if ai_result:
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
-                apply_result = await startChat(security_id, job_id, lid, cookies, headers)
+                apply_result = await start_chat(security_id, job_id, lid, self.cookies, self.headers)
                 # 还可以放入自定义信息
-                if self.resume_image_dict:
-                    self.ws_queue.put(("image", card["encryptUserId"], ""))
+                if self.resume_image_enabled:
+                    self.ws_queue.put(["task",("image", card["encryptUserId"], "")])
                 logger.info(f"job {job_data['job_name']}: {apply_result['message']}\n{job_requirements}\n\n")
             else:
                 logger.info(f"job {job_data['job_name']}: ai认为不匹配\n{job_requirements}\n\n")
@@ -85,10 +90,10 @@ class JobProcessor:
             )
             return result
 
-    async def _process_single_job(self, job_data, cookies, headers):
+    async def _process_single_job(self, job_data):
         try:
             return await asyncio.wait_for(
-                self._original_process_single_job(job_data, cookies, headers),
+                self._original_process_single_job(job_data),
                 timeout=120.0  # 每个任务单独超时
             )
         except asyncio.TimeoutError:
@@ -100,51 +105,33 @@ class JobProcessor:
             #raise
             return None
 
-    async def _process_batch(self, jobs_batch, cookies, headers):
-        tasks = [self._process_single_job(job, cookies, headers) for job in jobs_batch]
+    async def _process_batch(self, jobs_batch):
+        tasks = [self._process_single_job(job) for job in jobs_batch]
         return await asyncio.gather(*tasks)
 
-    def start_processing(self):
+    def run(self):
         self.loop = asyncio.new_event_loop()
-        self.ws_queue = queue.Queue()
-        self.ws_running_event = threading.Event()
-        self.ws_client = None
         asyncio.set_event_loop(self.loop)
 
-        while True:
-            batch = self.comm_queue.get()
-            if batch is None:  # 终止信号
-                self.done_event.set()
-                break
-
-            # 提取 cookies 和 headers
-            cookies = batch.get("cookies")
-            headers = batch.get("headers")
-            jobs_batch = batch.get("jobs")
-
-            # 初始化WebSocket客户端
-            if not self.ws_client:
-                self.ws_client = WSclient(
-                    recv_queue=self.ws_queue,
-                    running_event=self.ws_running_event,
-                    image_dict=self.resume_image_dict,
-                    headers=headers,
-                    cookies=cookies
-                )
-
-                self.ws_client.start()
-
-            try:
-                results = self.loop.run_until_complete(
-                    asyncio.wait_for(
-                        self._process_batch(jobs_batch, cookies, headers),
-                        timeout=600  # 单位：秒
+        while self.running_event:
+            batch = self.job_queue.get()
+            if batch[0]=="update_cookies":
+                _, self.cookies, self.headers = batch
+            elif batch[0]=="tasks":
+                _, jobs_batch = batch
+                self.done_event.clear()
+                try:
+                    results = self.loop.run_until_complete(
+                        asyncio.wait_for(
+                            self._process_batch(jobs_batch),
+                            timeout=600  # 单位：秒
+                        )
                     )
-                )
-                logger.info(f"Processed batch with {len(results)} jobs")
-            except asyncio.TimeoutError:
-                logger.info("Batch processing timed out after 600 seconds")
-                results = []  # 超时后的处理逻辑
-            results = [result for result in results if result is not None]
-            self.recv_queue.put(results)
-            self.done_event.set()  # 通知主进程处理完成
+                    logger.info(f"Processed batch with {len(results)} jobs")
+                except asyncio.TimeoutError:
+                    logger.info("Batch processing timed out after 600 seconds")
+                    results = []  # 超时后的处理逻辑
+                
+                results = [result for result in results if result is not None]
+                self.db_manager.save_jobs_details(jobs_batch,results)
+                self.done_event.set()
