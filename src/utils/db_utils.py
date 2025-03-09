@@ -183,40 +183,27 @@ class DatabaseManager:
         match = re.search(pattern, link)
         return match.groups() if match else None
 
-    def check_visited(self, job_id):
+    def check_visited(self, job_id, user_id=None):
         session = self.Session()
         try:
             job = session.query(JobDetail).get(job_id)
-            return job.visited if job else False
+            if not job:
+                return False
+            # 当有user_id时验证双重条件，没有时只验证visited
+            return job.visited and (str(user_id) in job.applied_account if user_id else True)
         finally:
             session.close()
-    def check_visited(self, job_id,user_id:str):
-        session = self.Session()
-        try:
-            job = session.query(JobDetail).get(job_id)
-            return (job.visited if job else False) and (str(user_id) in job.applied_account)
-        finally:
-            session.close()
-    def filterVisited(self,jobs):
-        filteredJobs=[]
-        for job in jobs:
-            job_name = job['job_name']
-            job_id = self.parseParams(job["job_link"])[0]
-            checkResult=self.check_visited(job_id)
-            if checkResult:
-                logger.info(f"已经访问过 招聘岗位: {job_name}")
-            else:
-                filteredJobs.append(job)
-        return filteredJobs
 
-    def filterVisited(self,jobs,user_id):
-        filteredJobs=[]
+    def filter_visited(self, jobs, user_id=None):
+        filteredJobs = []
         for job in jobs:
             job_name = job['job_name']
             job_id = self.parseParams(job["job_link"])[0]
-            checkResult=self.check_visited(job_id,user_id)
+            checkResult = self.check_visited(job_id, user_id)
+            
             if checkResult:
-                logger.info(f"该账号已经访问过 招聘岗位: {job_name}")
+                log_msg = f"该账号已经访问过 招聘岗位: {job_name}" if user_id else f"已经访问过 招聘岗位: {job_name}"
+                logger.info(log_msg)
             else:
                 filteredJobs.append(job)
         return filteredJobs

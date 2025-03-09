@@ -14,6 +14,7 @@ from .techwolf_pb2 import TechwolfChatProtocol
 from google.protobuf import json_format
 import secrets
 from utils.general import get_user_info,get_wt2
+from utils.session_manager import SessionManager
 
 class WsClient(threading.Thread):
     hostname = "ws6.zhipin.com"
@@ -42,6 +43,11 @@ class WsClient(threading.Thread):
         self.done = done_event
         self._running = running_event
 
+    def _update_cookies(self):
+        # 从SessionManager获取最新配置
+        session = SessionManager.get_sync_session()
+        self.cookies = session.cookies.get_dict()
+        self.headers = session.headers
     def _init_client(self):
         client_id = f"ws-{secrets.token_hex(8).upper()}"
         # MQTT客户端配置
@@ -52,9 +58,9 @@ class WsClient(threading.Thread):
             clean_session=True
         )
         self._setup_callbacks()
-        self.uid, user_info = get_user_info(self.cookies,self.headers)
+        self.uid, user_info = get_user_info()
         self.token = user_info["zpData"]['token']
-        self.wt2 = get_wt2(self.cookies,self.headers)
+        self.wt2 = get_wt2()
 
         # 配置WebSocket连接
         ws_headers = {
@@ -131,6 +137,9 @@ class WsClient(threading.Thread):
             elif recv_msg[0]=="task":
                 if self.client is None:
                     self.recv_queue.put(recv_msg)
+                    self._update_cookies()
+                    self._init_client()
+                    continue
                 _, task = recv_msg
                 self.done.clear()
                 self.send_message(task)

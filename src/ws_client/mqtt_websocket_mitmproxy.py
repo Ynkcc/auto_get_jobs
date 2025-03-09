@@ -7,124 +7,75 @@ from logging.handlers import RotatingFileHandler
 from typing import Optional
 from google.protobuf import json_format
 from techwolf_pb2 import TechwolfChatProtocol
+from google.protobuf import json_format
 
 class BossZPInspector:
-    """
-    Boss直聘WebSocket分析工具
-    """
+    """直聘协议解析器（假设数据可靠版本）"""
     
     def __init__(self):
         self.target_host = "ws6.zhipin.com"
-        self.connection_map = {}
-        self._configure_logger()
+        self.logger = self._init_logger()
 
-    def _configure_logger(self):
-        """自定义日志配置"""
-        self.logger = logging.getLogger("BOSS_WS_FILE_LOGGER")
-        self.logger.setLevel(logging.DEBUG)
-
-        # 清除可能存在的默认handler
-        if self.logger.handlers:
-            for handler in self.logger.handlers[:]:
-                self.logger.removeHandler(handler)
-
-        # 创建轮转日志handler
-        handler = RotatingFileHandler(
-            filename='boss_websocket.log',
-            mode='a',
-            maxBytes=1*1024*1024,  # 100MB
-            backupCount=0,
-            encoding='utf-8'
-        )
-
-        # 设置日志格式
-        formatter = logging.Formatter(
+    def _init_logger(self):
+        """初始化日志系统"""
+        logger = logging.getLogger("BOSS_WS_LOGGER")
+        logger.setLevel(logging.INFO)
+        handler = RotatingFileHandler('boss_websocket.log', maxBytes=100*1024*1024, backupCount=1, encoding='utf-8')
+        handler.setFormatter(logging.Formatter(
             fmt='%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        handler.setFormatter(formatter)
-
-        self.logger.addHandler(handler)
+        ))
+        logger.addHandler(handler)
+        return logger
 
     def websocket_message(self, flow: http.HTTPFlow) -> None:
-        """处理WebSocket消息"""
+        """消息处理入口"""
         if flow.request.host != self.target_host:
             return
 
         message = flow.websocket.messages[-1]
+        metadata = {
+            "client": flow.client_conn.peername[0],
+            "direction": "C→S" if message.from_client else "S→C",
+            "type": "TEXT" if message.is_text else "BIN",
+            "size": f"{len(message.content):,}b",
+            "time": datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3],
+            "topic": None
+        }
         
-        try:
-            metadata = {
-                "client": flow.client_conn.peername[0],
-                "direction": "C→S" if message.from_client else "S→C",
-                "type": "TEXT" if message.is_text else "BIN",
-                "size": f"{len(message.content):,}b",
-                "time": datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            }
-
-            log_entry = {
-                "meta": metadata,
-                "content": self._parse_content(message)
-            }
-
-            self.logger.info("\n" + json.dumps(
-                log_entry, 
-                indent=2, 
-                ensure_ascii=False,
-                sort_keys=False
-            ))
-
-        except Exception as e:
-            self.logger.error(f"PROCESS ERROR: {str(e)}", exc_info=True)
-
-    def _parse_content(self, message) -> Optional[dict]:
-        """解析消息内容"""
         if message.is_text:
-            return {"text": message.content}
+            content = {"text": message.content}
+        else:
+            content, metadata["topic"] = self._parse_binary(message.content)
+        if metadata["topic"] is None:
+            self.logger.debug("\n%s", json.dumps({"meta": metadata, "content": content}, indent=2, ensure_ascii=False))
+        else:
+            self.logger.info("\n%s", json.dumps({"meta": metadata, "content": content}, indent=2, ensure_ascii=False))
+
+    def _parse_binary(self, data: bytes) -> tuple:
+        """二进制数据统一处理"""
+        packet_type = (data[0] & 0xF0) >> 4
         
-        content = message.content if isinstance(message.content, bytes) else message.content.encode()
+        if packet_type != 3:  # 非PUBLISH类型
+            return {"hex": data.hex()}, None
         
-        # 尝试MQTT+Protobuf解析
-        try:
-            mqtt_payload = self._parse_mqtt(content)
-            return self._parse_protobuf(mqtt_payload)
-        except Exception as e:
-            self.logger.debug(f"解析失败，输出原始hex: {str(e)}")
-            return {"raw_hex": content.hex()}
-
-    def _parse_protobuf(self, data: bytes) -> dict:
-        """Protobuf解析统一方法"""
-        protocol = TechwolfChatProtocol()
-        protocol.ParseFromString(data)
-        return json_format.MessageToDict(
-            protocol
-        )
-
-    def _parse_mqtt(self, data: bytes) -> bytes:
-
-        first_byte = data[0]
-        packet_type = (first_byte & 0xF0) >> 4
-        qos_flag = first_byte & 0b00000110
-
-        # 仅处理PUBLISH报文（类型3）
-        if packet_type != 3:
-            raise ValueError(f"非PUBLISH类型MQTT报文: {packet_type}")
-
-        # 解析剩余长度
+        # MQTT PUBLISH解析
         index = 1
-        while data[index]>0x7f and index<=4:
-            index+=1
-
+        while data[index] > 0x7f and index <=4:
+            index +=1
         index +=1
-
-        topic_name_length=int.from_bytes(data[index:index+2], byteorder='big')
-        index+=2
-        index+=topic_name_length
-
-
-        if qos_flag > 0:
-            index += 2
-
-        return data[index:]
+        
+        topic_length = int.from_bytes(data[index:index+2], 'big')
+        index +=2
+        topic = data[index:index+topic_length].decode()
+        index += topic_length
+        
+        if data[0] & 0x06:  # QoS处理
+            index +=2
+        
+        # Protobuf解析（数据可靠直接解析）
+        pb_data = TechwolfChatProtocol()
+        pb_data.ParseFromString(data[index:])
+        return json_format.MessageToDict(pb_data), topic
 
 addons = [BossZPInspector()]

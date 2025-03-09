@@ -52,6 +52,7 @@ from utils.general import *
 from utils.db_utils import DatabaseManager
 from job_handler import JobHandler
 from ws_client.ws_client import WsClient
+from utils.session_manager import SessionManager
 
 def login(driver, account):
     """
@@ -131,8 +132,8 @@ def main(config):
                 headers = {
                     'User-Agent': driver.execute_script("return navigator.userAgent;")
                 }
-                job_queue.put(["update_cookies",cookies,headers])
-                ws_queue.put(["update_cookies",cookies,headers])
+                SessionManager.update_session(cookies, headers)
+
                 job_queue.put(["tasks",jobs])
                 time.sleep(config.crawler.next_page_delay)
                 if not next_page(driver):

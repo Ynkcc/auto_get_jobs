@@ -25,6 +25,7 @@ class JobHandler(threading.Thread):
         self.db_manager = DatabaseManager(config.database.filename)
         self.inactive_keywords = config.job_check.inactive_status
         self.resume_image_enabled = config.application.send_resume_image
+        self.min_salary,self.max_salary = config.job_check.salary_range
         self.cookies= {}
         self.headers = {}
 
@@ -44,7 +45,7 @@ class JobHandler(threading.Thread):
         try:
             # 获取职位详细信息（限速）
             await self.rate_limit.get_token()  # 限速调用
-            job_detail = await get_job_info(security_id, lid, self.cookies, self.headers)
+            job_detail = await get_job_info(security_id, lid)
             result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
@@ -72,7 +73,7 @@ class JobHandler(threading.Thread):
             if ai_result:
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
-                apply_result = await start_chat(security_id, job_id, lid, self.cookies, self.headers)
+                apply_result = await start_chat(security_id, job_id, lid)
                 # 还可以放入自定义信息
                 if self.resume_image_enabled:
                     self.ws_queue.put(["task",("image", card["encryptUserId"], "")])
@@ -119,11 +120,16 @@ class JobHandler(threading.Thread):
                 _, self.cookies, self.headers = batch
             elif batch[0]=="tasks":
                 _, jobs_batch = batch
+                # 满足薪资要求的岗位
+                jobs_batch = filter_jobs_by_salary(jobs_batch, self.min_salary)
+                # 未被访问过的岗位
+                unvisited_jobs = self.db_manager.filter_visited(jobs_batch)
+                
                 self.done_event.clear()
                 try:
                     results = self.loop.run_until_complete(
                         asyncio.wait_for(
-                            self._process_batch(jobs_batch),
+                            self._process_batch(unvisited_jobs),
                             timeout=600  # 单位：秒
                         )
                     )

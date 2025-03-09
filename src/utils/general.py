@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-
+from .session_manager import SessionManager
 # 本地模块导入
 logger = logging.getLogger(__name__)
 
@@ -377,10 +377,11 @@ def parse_params(link):
     return match.groups() if match else None
 
 
-def get_user_info(cookies, headers):
+def get_user_info():
     url = "https://www.zhipin.com/wapi/zpuser/wap/getUserInfo.json"
+    session = SessionManager.get_sync_session()
     try:
-        user_info = requests.get(url, cookies=cookies, headers=headers).json()
+        user_info = session.get(url).json()
         user_id = user_info['zpData']['userId']
         user_name = user_info['zpData']['name']
         true_man = user_info['zpData']['trueMan']
@@ -393,16 +394,12 @@ def get_user_info(cookies, headers):
         return "UNKNOWN", None
     return user_id, user_info
 
-def get_wt2(cookies,headers):
+def get_wt2():
     """获取wt2验证参数"""
     try:
         url = "https://www.zhipin.com/wapi/zppassport/get/wt"
-        response = requests.get(
-            url,
-            cookies=cookies,
-            headers=headers,
-            timeout=10
-        )
+        session = SessionManager.get_sync_session()
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         wt2_data = response.json()
 
@@ -410,7 +407,7 @@ def get_wt2(cookies,headers):
             return wt2_data['zpData'].get('wt2')
         raise Exception(f"获取wt2失败: {wt2_data.get('message')}")
     except Exception as e:
-        self.logger.error(f"获取wt2异常: {str(e)}")
+        logger.error(f"获取wt2异常: {str(e)}")
         return None
 
 
@@ -423,30 +420,18 @@ def calculate_md5(filepath):
     return hash_md5.hexdigest()
 
 
-def upload_image(filepath,cookies,headers):
+def upload_image(filepath):
     """
     上传图片
     """
-
-    # #快速上传接口（若服务端已有相同文件则直接返回结果）
-    # url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
-    # data = {
-    #     #securityId 缺少该参数，zpData必然为null
-    #     "fileMd5": file_md5,
-    #     "fileSize": file_size
-    # }
     try:
         url = "https://www.zhipin.com/wapi/zpupload/image/uploadSingle"
+        session = SessionManager.get_sync_session()
 
         with open(filepath, "rb") as f:
             files = {"file": (os.path.basename(filepath), f, "image/jpeg")}
 
-            response = requests.post(
-                url,
-                headers=headers,
-                cookies=cookies,
-                files=files
-            )
+            response = session.post(url, files=files)
         zp_data = response.json()["zpData"]
         result = {
             "url": zp_data['url'],
@@ -490,37 +475,7 @@ class TokenBucket:
                 # 等待直到有令牌
                 await asyncio.sleep(1 / self.rate)
 
-class SessionManager:
-    _sync_session = requests.Session()
-    _async_session = None
-    _lock = threading.Lock()
-
-    @classmethod
-    def get_sync_session(cls):
-        return cls._sync_session
-
-    @classmethod
-    async def get_async_session(cls):
-        if cls._async_session is None or cls._async_session.closed:
-            async with cls._lock:
-                if cls._async_session is None or cls._async_session.closed:
-                    # 调整连接池参数
-                    connector = aiohttp.TCPConnector(
-                        limit=50,  # 增大连接池容量
-                        limit_per_host=20,  # 每个host最大连接数
-                        ssl=False
-                    )
-                    cls._async_session = aiohttp.ClientSession(
-                        connector=connector,
-                        timeout=aiohttp.ClientTimeout(total=30)
-                    )
-        return cls._async_session
-
-    @classmethod
-    async def close_async_session(cls):
-        if cls._async_session and not cls._async_session.closed:
-            await cls._async_session.close()
-async def get_job_info(securityId, lid, cookies=None, headers=None, max_retries=3):
+async def get_job_info(securityId, lid, max_retries=3):
     path = "/wapi/zpgeek/job/card.json"
     url = f"{BASE_URL}{path}"
     params = {
@@ -530,22 +485,20 @@ async def get_job_info(securityId, lid, cookies=None, headers=None, max_retries=
 
     async def _request(attempt):
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url,
-                    params=params,
-                    cookies=cookies,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30 + attempt*5)  # 动态超时
-                ) as response:
-                    if response.status == 200:
-                        return await response.json()
-                    elif response.status == 403:
-                        logger.warning(f"[403 Forbidden] 可能触发反爬虫 securityId={securityId}")
-                        return None
-                    else:
-                        logger.error(f"请求失败 HTTP {response.status} - {await response.text()}")
-                        return None
+            session = await SessionManager.get_async_session()
+            async with session.get(
+                url,
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=30 + attempt*5)  # 动态超时
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                elif response.status == 403:
+                    logger.warning(f"[403 Forbidden] 可能触发反爬虫 securityId={securityId}")
+                    return None
+                else:
+                    logger.error(f"请求失败 HTTP {response.status} - {await response.text()}")
+                    return None
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.warning(f"请求异常 [{type(e).__name__}] 第{attempt}次重试: {str(e)}")
             return None
@@ -560,7 +513,7 @@ async def get_job_info(securityId, lid, cookies=None, headers=None, max_retries=
     logger.error(f"请求失败（已达最大重试次数 {max_retries}）")
     return None
 
-async def start_chat(securityId, jobId, lid, cookies=None, headers=None):
+async def start_chat(securityId, jobId, lid):
     path = "/wapi/zpgeek/friend/add.json"
     url = f"{BASE_URL}{path}"
     params = {
@@ -569,12 +522,12 @@ async def start_chat(securityId, jobId, lid, cookies=None, headers=None):
         "lid": lid
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params, cookies=cookies, headers=headers, timeout=30) as response:
-            if response.status == 200:
-                return await response.json()
-            else:
-                response.raise_for_status()
+    session = await SessionManager.get_async_session()
+    async with session.get(url, params=params, timeout=30) as response:
+        if response.status == 200:
+            return await response.json()
+        else:
+            response.raise_for_status()
 
 
 # 以下接口待验证
