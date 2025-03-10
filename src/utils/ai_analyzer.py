@@ -6,7 +6,7 @@ import re
 import aiohttp
 
 from utils.config_manager import ConfigManager
-
+from utils.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,42 +53,42 @@ class AiAnalyzer:
     async def ai_hr_check(self, job_detail):
         for attempt in range(5):
             try:
-                async with aiohttp.ClientSession() as session:
-                    # 构建请求体
-                    payload = {
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": self.ai_prompt},
-                            {"role": "user", "content": f"岗位要求：{job_detail}"},
-                            {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"}
-                        ],
-                        "temperature": self.temperature,
-                        #"max_tokens": 50 DeepSeek-R1包含思考过程，max_tokens太低会使回答不完整
-                    }
+                session = await SessionManager.get_async_session()
+                # 构建请求体
+                payload = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": self.ai_prompt},
+                        {"role": "user", "content": f"岗位要求：{job_detail}"},
+                        {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"}
+                    ],
+                    "temperature": self.temperature,
+                    #"max_tokens": 50 DeepSeek-R1包含思考过程，max_tokens太低会使回答不完整
+                }
 
-                    async with session.post(
-                        self.api_url,
-                        headers=self.headers,
-                        json=payload,
-                        timeout=30
-                    ) as response:
-                        response.raise_for_status()
-                        data = await response.json()
+                async with session.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=120
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
 
-                        origin_content = data['choices'][0]['message']['content'].lower()
-                        match = re.match(
-                            r"<think>(.*?)</think>(.*)",
-                            origin_content,
-                            re.DOTALL
-                        )
-                        ai_think = None
-                        if match:
-                            ai_think = match.group(1)
-                            content = match.group(2)
-                        else:
-                            content = origin_content
-                        check_result = "true" in content
-                        return check_result, ai_think
+                    origin_content = data['choices'][0]['message']['content'].lower()
+                    match = re.match(
+                        r"<think>(.*?)</think>(.*)",
+                        origin_content,
+                        re.DOTALL
+                    )
+                    ai_think = None
+                    if match:
+                        ai_think = match.group(1)
+                        content = match.group(2)
+                    else:
+                        content = origin_content
+                    check_result = "true" in content
+                    return check_result, ai_think
 
             except aiohttp.ClientError as e:
                 logger.warning(f"网络请求失败 ({attempt+1}/5): {str(e)}")
@@ -103,4 +103,4 @@ class AiAnalyzer:
                 logger.error(f"AI分析失败 ({attempt+1}/5): {str(e)}")
                 await asyncio.sleep(1)
 
-        return False
+        return False,None

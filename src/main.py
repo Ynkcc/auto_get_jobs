@@ -113,36 +113,38 @@ def main(config):
     for account in config.accounts:
         manager = login(driver, account)
 
-        # try:
-        url_list=list(build_search_url(config.job_search))
-        for url in url_list:
-            driver.get(url)
-            while True:
-                try:
-                    # 等待页面加载
-                    WebDriverWait(driver, config.crawler.page_load_timeout).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
-                    )
-                except TimeoutException:
-                    print("获取页面职位超时，可能无岗位或被封禁")
-                    break
+        try:
+            url_list=list(build_search_url(config.job_search))
+            for url in url_list:
+                driver.get(url)
+                while True:
+                    try:
+                        # 等待页面加载
+                        WebDriverWait(driver, config.crawler.page_load_timeout).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
+                        )
+                    except TimeoutException:
+                        print("获取页面职位超时，可能无岗位或被封禁")
+                        break
 
-                jobs = get_page_jobs_info(driver)
-                cookies = {cookie['name']: cookie['value'] for cookie in driver.get_cookies()}
-                headers = {
-                    'User-Agent': driver.execute_script("return navigator.userAgent;")
-                }
-                SessionManager.update_session(cookies, headers)
+                    jobs = get_page_jobs_info(driver)
+                    cookies = {cookie['name']: cookie['value'] for cookie in driver.get_cookies()}
+                    headers = {
+                        'User-Agent': driver.execute_script("return navigator.userAgent;")
+                    }
+                    SessionManager.update_session(cookies, headers)
+                    ws_queue.put(("task",["msg","CVvXOKlCzcOcx-w1e7pWxNa5WBgP4mAO9nLXva0eE4TBz-Jhn14PnkHdWWzEDSVucUobfX3prxBM84fHxRvOJq4EsHbCof1M5TKPIv7wHy5BYjNcJEHEcN_jRFnHtFhavIuPf8K3_Tw-","21dd971c97adeb550XR_2du4EVpT","你好"]))
+                    time.sleep(600)
+                    job_queue.put(["tasks",jobs])
+                    time.sleep(config.crawler.next_page_delay)
+                    if not next_page(driver):
+                        break
 
-                job_queue.put(["tasks",jobs])
-                time.sleep(config.crawler.next_page_delay)
-                if not next_page(driver):
-                    break
-
-        # finally:
-
-        #     manager.stop_autosave()
-        #     manager.clear_data()
+        finally:
+            job_queue.join()
+            ws_queue.join()
+            manager.stop_autosave()
+            manager.clear_data()
 
 if __name__=='__main__':
     main(config)

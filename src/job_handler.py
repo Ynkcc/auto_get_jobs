@@ -76,7 +76,7 @@ class JobHandler(threading.Thread):
                 apply_result = await start_chat(security_id, job_id, lid)
                 # 还可以放入自定义信息
                 if self.resume_image_enabled:
-                    self.ws_queue.put(["task",("image", card["encryptUserId"], "")])
+                    self.ws_queue.put(["task",("image", card["securityId"],card["encryptUserId"], "")])
                 logger.info(f"job {job_data['job_name']}: {apply_result['message']}\n{job_requirements}\n\n")
             else:
                 logger.info(f"job {job_data['job_name']}: ai认为不匹配\n{job_requirements}\n\n")
@@ -95,7 +95,7 @@ class JobHandler(threading.Thread):
         try:
             return await asyncio.wait_for(
                 self._original_process_single_job(job_data),
-                timeout=120.0  # 每个任务单独超时
+                timeout=240.0  # 每个任务单独超时
             )
         except asyncio.TimeoutError:
             logger.info(f"Job {job_data['job_name']} 被强制取消")
@@ -130,7 +130,7 @@ class JobHandler(threading.Thread):
                     results = self.loop.run_until_complete(
                         asyncio.wait_for(
                             self._process_batch(unvisited_jobs),
-                            timeout=600  # 单位：秒
+                            timeout=900  # 单位：秒
                         )
                     )
                     logger.info(f"Processed batch with {len(results)} jobs")

@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 import threading
 import time
+import os
 import json
 import queue
 import requests
@@ -13,9 +14,9 @@ import paho.mqtt.client as mqtt
 from .techwolf_pb2 import TechwolfChatProtocol
 from google.protobuf import json_format
 import secrets
-from utils.general import get_user_info,get_wt2
+from utils.general import get_user_info,get_wt2,upload_image
 from utils.session_manager import SessionManager
-
+from utils.config_manager import ConfigManager
 class WsClient(threading.Thread):
     hostname = "ws6.zhipin.com"
     port = 443
@@ -42,6 +43,9 @@ class WsClient(threading.Thread):
         self.client = None
         self.done = done_event
         self._running = running_event
+        config=ConfigManager.get_config()
+        self.resume_image_file=config.application.resume_image_file
+        self.send_resume_image=config.application.send_resume_image and os.path.exists(self.resume_image_file)
 
     def _update_cookies(self):
         # 从SessionManager获取最新配置
@@ -87,42 +91,59 @@ class WsClient(threading.Thread):
         :param msg: 消息内容
         :return:
         """
-        msgtype, boss_id, msg = task
-        try:
-            protocol = TechwolfChatProtocol()
-            t = int(time.time() * 1000)
-            mid = t + 68256432452609
-            chat = {
+
+
+        def _build_base_message(boss_id):
+            """构建基础消息结构"""
+            timestamp = str(int(time.time() * 1000))
+            mid = timestamp
+            return {
                 "type": 1,
-                "messages": [
-                    {
-                        "from": {
-                            "uid": "0"
-                        },
-                        "to": {
-                            "uid": "0",
-                            "name": boss_id
-                        },
-                        "type": 1,
-                        "mid": mid,
-                        "time": t,
-                        "body": {
-                            "templateId": 1,
-                        },
-                        "cmid": mid
-                    }
-                ]
+                "messages": [{
+                    "from": {"uid": "0"},
+                    "to": {"uid": "0", "name": boss_id},
+                    "type": 1,
+                    "mid": mid,
+                    "time": timestamp,
+                    "body": {"templateId": 1},
+                    "cmid": mid
+                }]
             }
+
+        def _build_text_message(chat, text):
+            """构建文本消息体"""
+            body = chat["messages"][0]["body"]
+            body.update({
+                "text": text,
+                "type": 1
+            })
+
+        def _build_image_message(chat,image_dict):
+            """构建图片消息体"""
+            body = chat["messages"][0]["body"]
+            body.update({
+                "type": 3,
+                "image": {"originImage":image_dict}
+            })
+        try:
+            msgtype, securityId, boss_id, msg = task
+            chat = _build_base_message(boss_id)
             if msgtype == "msg":
-                chat["messages"][0]["body"]["text"] = msg
-                chat["messages"][0]["body"]["type"] = 1
+                _build_text_message(chat,msg)
             elif msgtype == "image":
-                chat["messages"][0]["body"]["type"] = 3
-                chat["messages"][0]["body"]["image"] = {"originImage": self.image_dict}
+                if not self.send_resume_image:
+                    return
+                image_dict = upload_image(self.resume_image_file,securityId)
+                if image_dict is None:
+                    return
+                _build_image_message(chat, image_dict)
             else:
                 return
+            protocol = TechwolfChatProtocol()
+            logger.info(json.dumps(chat, indent=4))
             json_format.ParseDict(chat, protocol)
-            self.client.publish(self.topic, protocol.SerializeToString())
+            publish_content=protocol.SerializeToString()
+            self.client.publish(self.topic, publish_content)
         except Exception as e:
             self.logger.error(f"Failed to send application: {str(e)}")
 

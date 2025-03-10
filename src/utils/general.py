@@ -13,12 +13,15 @@ import asyncio
 import aiohttp
 import pandas as pd
 import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+import mimetypes
 import yaml
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from .session_manager import SessionManager
+
 # 本地模块导入
 logger = logging.getLogger(__name__)
 
@@ -411,27 +414,35 @@ def get_wt2():
         return None
 
 
-def calculate_md5(filepath):
+def calculate_md5(file_path):
     """计算文件的 MD5 哈希值"""
     hash_md5 = hashlib.md5()
-    with open(filepath, "rb") as f:
+    with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
 
-def upload_image(filepath):
+def full_upload_image(file_path,securityId):
     """
     上传图片
     """
     try:
         url = "https://www.zhipin.com/wapi/zpupload/image/uploadSingle"
         session = SessionManager.get_sync_session()
-
-        with open(filepath, "rb") as f:
-            files = {"file": (os.path.basename(filepath), f, "image/jpeg")}
-
-            response = session.post(url, files=files)
+        mime_type, _ = mimetypes.guess_type(file_path)
+        with open(file_path, "rb") as f:
+            mp_encoder = MultipartEncoder(
+                fields=[
+                    ('securityId', securityId),
+                    ('source', 'chat_file'),
+                    ('file', (os.path.basename(file_path), f, mime_type ))
+                ]
+            )
+            headers = {'Content-Type': mp_encoder.content_type,
+            'user-agent':"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+            }
+            response = session.post(url, data=mp_encoder,headers=headers)
         zp_data = response.json()["zpData"]
         result = {
             "url": zp_data['url'],
@@ -440,18 +451,42 @@ def upload_image(filepath):
         }
         return result
     except Exception:
-        logger.error("上传简历图片出现错误")
+        logger.error(f"上传简历图片出现错误")
+        logger.exception("An error occurred") 
         return None
 
-def quickly_upload_image(filepath,securityId,cookies,headers):
+def quickly_upload_image(file_path,securityId):
     #快速上传接口（若服务端已有相同文件则直接返回结果）
     url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
     data = {
-        "securityId": '',
-        "fileMd5": file_md5,
-        "fileSize": file_size
+        "fileMd5": calculate_md5(file_path),
+        "fileSize": os.path.getsize(file_path),
+        "source":"chat_file",
+        "securityId": securityId
     }
-    return None
+    session = SessionManager.get_sync_session()
+    response = session.post(url, data=data)
+    zp_data = response.json()["zpData"]
+    if zp_data.get("url"):
+        result = {
+        "url": zp_data['url'],
+        "width": zp_data["metadata"]["width"],
+        "height": zp_data["metadata"]['height']
+        }
+    else:
+        result = False
+    return result
+
+def upload_image(file_path,securityId):
+    quickly_upload_result=quickly_upload_image(file_path,securityId)
+    if quickly_upload_result:
+        return quickly_upload_result
+    else:
+        full_upload_result=full_upload_image(file_path,securityId)
+        return full_upload_result
+    
+
+
 
 class TokenBucket:
     def __init__(self, rate: int, capacity: int):
