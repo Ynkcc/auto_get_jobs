@@ -444,15 +444,26 @@ def full_upload_image(file_path,securityId):
             }
             response = session.post(url, data=mp_encoder,headers=headers)
         zp_data = response.json()["zpData"]
+        origin_width = zp_data["metadata"]["width"]
+        origin_height = zp_data["metadata"]['height']
+        tiny_width = 200
+        tiny_height = int(tiny_width * origin_height / origin_width)
         result = {
-            "url": zp_data['url'],
-            "width": zp_data["metadata"]["width"],
-            "height": zp_data["metadata"]['height']
+            "tinyImage": {
+                "url": zp_data['tinyUrl'],
+                "width": tiny_width,
+                "height": tiny_height
+            },
+            "originImage": {
+                "url": zp_data['url'],
+                "width": origin_width,
+                "height": origin_height
+            }
         }
         return result
     except Exception:
         logger.error(f"上传简历图片出现错误")
-        logger.exception("An error occurred") 
+        logger.exception("An error occurred")
         return None
 
 def quickly_upload_image(file_path,securityId):
@@ -468,10 +479,21 @@ def quickly_upload_image(file_path,securityId):
     response = session.post(url, data=data)
     zp_data = response.json()["zpData"]
     if zp_data.get("url"):
+        origin_width = zp_data["metadata"]["width"]
+        origin_height = zp_data["metadata"]['height']
+        tiny_width = 200
+        tiny_height = int(tiny_width * origin_height / origin_width)
         result = {
-        "url": zp_data['url'],
-        "width": zp_data["metadata"]["width"],
-        "height": zp_data["metadata"]['height']
+            "tinyImage": {
+                "url": zp_data['tinyUrl'],
+                "width": tiny_width,
+                "height": tiny_height
+            },
+            "originImage": {
+                "url": zp_data['url'],
+                "width": origin_width,
+                "height": origin_height
+            }
         }
     else:
         result = False

@@ -56,8 +56,7 @@ class SessionManager:
 
             # 更新cookies
             if needs_rebuild and cls._async_session and not cls._async_session.closed:
-                for name,value in cookies.items():
-                    cls._async_session.cookie_jar.update_cookies({name:value},URL("https://www.zhipin.com"))
+                cls._async_session.cookie_jar.update_cookies(cookies,URL("https://www.zhipin.com"))
 
             if cls._async_session is None or cls._async_session.closed:
                 # 从当前配置创建新session

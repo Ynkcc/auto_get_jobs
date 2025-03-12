@@ -17,3 +17,20 @@ username(token) getUserInfo()得到，原字符串后+'|0' 静态
 password /wapi/zppassport/get/wt 得到 get请求 动态变化
 
 CLIENT_ID ，`ws-`+16位英文字母
+
+```
+			"Sec-WebSocket-Protocol": "mqtt",
+		}
+
+        # This is checked in ws_set_options so it will either be None, a
+        # dictionary, or a callable
+        if isinstance(extra_headers, dict):
+=======
+			"Sec-WebSocket-Protocol": websocket_headers.get('Sec-WebSocket-Protocol', 'mqtt'),
+		}
+
+        # This is checked in ws_set_options so it will either be None, a
+        # dictionary, or a callable
+        if isinstance(extra_headers, dict):
+
+```

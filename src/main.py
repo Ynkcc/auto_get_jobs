@@ -133,7 +133,7 @@ def main(config):
                         'User-Agent': driver.execute_script("return navigator.userAgent;")
                     }
                     SessionManager.update_session(cookies, headers)
-                    ws_queue.put(("task",["msg","CVvXOKlCzcOcx-w1e7pWxNa5WBgP4mAO9nLXva0eE4TBz-Jhn14PnkHdWWzEDSVucUobfX3prxBM84fHxRvOJq4EsHbCof1M5TKPIv7wHy5BYjNcJEHEcN_jRFnHtFhavIuPf8K3_Tw-","21dd971c97adeb550XR_2du4EVpT","你好"]))
+                    ws_queue.put(("task",["image","UgEoLMYu9WPMn-L1hqffGiml1W-xDXwHsToIb2A0_ZkapolHvCIqQWRSIJSuYmfvOsTnCYrUhYODQA08mdiDjLyFN8SwqxdkX_dtJGoI--vT-Z1b2A~~","3aa60c387c96fc671X172d66GFM~",""]))
                     time.sleep(600)
                     job_queue.put(["tasks",jobs])
                     time.sleep(config.crawler.next_page_delay)

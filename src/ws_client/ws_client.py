@@ -4,6 +4,7 @@ EditBy : Ynkcc
 '''
 import logging
 logger = logging.getLogger(__name__)
+import socks
 import threading
 import time
 import os
@@ -43,33 +44,41 @@ class WsClient(threading.Thread):
         self.client = None
         self.done = done_event
         self._running = running_event
-        config=ConfigManager.get_config()
-        self.resume_image_file=config.application.resume_image_file
-        self.send_resume_image=config.application.send_resume_image and os.path.exists(self.resume_image_file)
+        config = ConfigManager.get_config()
+        self.resume_image_file = config.application.resume_image_file
+        self.send_resume_image = config.application.send_resume_image and os.path.exists(
+            self.resume_image_file)
 
     def _update_cookies(self):
         # 从SessionManager获取最新配置
         session = SessionManager.get_sync_session()
         self.cookies = session.cookies.get_dict()
         self.headers = session.headers
+
     def _init_client(self):
         client_id = f"ws-{secrets.token_hex(8).upper()}"
         # MQTT客户端配置
         self.client = mqtt.Client(
             client_id=client_id,
-            protocol=3,
+            protocol=4,
             transport='websockets',
             clean_session=True
         )
+        self.client.proxy_set(proxy_type=socks.HTTP, proxy_addr="127.0.0.1", proxy_port=8888)
         self._setup_callbacks()
-        self.uid, user_info = get_user_info()
-        self.token = user_info["zpData"]['token']
-        self.wt2 = get_wt2()
+        try:
+            self.uid, user_info = get_user_info()
+            self.token = user_info["zpData"]['token']
+            self.wt2 = get_wt2()
+        except Exception as e:
+            self.logger.error(f"获取用户信息失败, 无法初始化客户端: {e}")
+            return False  # 初始化失败
 
         # 配置WebSocket连接
         ws_headers = {
             "Cookie": "; ".join([f"{k}={v}" for k, v in self.cookies.items()]),
-            "User-Agent": self.headers.get('User-Agent', '')
+            "User-Agent": self.headers.get('User-Agent', ''),
+            "Sec-WebSocket-Protocol": self.wt2
         }
 
         self.client.ws_set_options(
@@ -77,12 +86,17 @@ class WsClient(threading.Thread):
             headers=ws_headers
         )
         self.client.tls_set()
+        self.client.tls_insecure_set(False)
         self.client.enable_logger(logger=logger)
         self.client.username_pw_set(self.token + "|0", self.wt2)
 
         # 建立连接
-        self.client.connect(self.hostname, self.port, keepalive=15)
-        self.client.loop_start()
+        try:
+            self.client.connect(self.hostname, self.port, keepalive=15)
+            self.client.loop_start()
+        except Exception as e:
+            self.logger.error(f"连接失败: {e}")
+            return False
 
     def send_message(self, task):
         """
@@ -92,10 +106,9 @@ class WsClient(threading.Thread):
         :return:
         """
 
-
         def _build_base_message(boss_id):
             """构建基础消息结构"""
-            timestamp = str(int(time.time() * 1000))
+            timestamp = int(time.time() * 1000)
             mid = timestamp
             return {
                 "type": 1,
@@ -118,32 +131,40 @@ class WsClient(threading.Thread):
                 "type": 1
             })
 
-        def _build_image_message(chat,image_dict):
+        def _build_image_message(chat, image_dict):
             """构建图片消息体"""
             body = chat["messages"][0]["body"]
             body.update({
                 "type": 3,
-                "image": {"originImage":image_dict}
+                "image": image_dict
             })
+
         try:
             msgtype, securityId, boss_id, msg = task
             chat = _build_base_message(boss_id)
             if msgtype == "msg":
-                _build_text_message(chat,msg)
+                _build_text_message(chat, msg)
             elif msgtype == "image":
                 if not self.send_resume_image:
                     return
-                image_dict = upload_image(self.resume_image_file,securityId)
+                image_dict = upload_image(self.resume_image_file, securityId)
                 if image_dict is None:
                     return
                 _build_image_message(chat, image_dict)
             else:
                 return
             protocol = TechwolfChatProtocol()
-            logger.info(json.dumps(chat, indent=4))
             json_format.ParseDict(chat, protocol)
-            publish_content=protocol.SerializeToString()
-            self.client.publish(self.topic, publish_content)
+            publish_content = protocol.SerializeToString()
+
+            if self.client and self.client.is_connected():
+                publish_result = self.client.publish(self.topic, publish_content, qos=1)
+                publish_result.wait_for_publish()
+                if publish_result.rc != mqtt.MQTT_ERR_SUCCESS:
+                    self.logger.error(f"消息发布失败: {publish_result}")
+            else:
+                self.logger.error("客户端未连接，无法发送消息")
+
         except Exception as e:
             self.logger.error(f"Failed to send application: {str(e)}")
 
@@ -151,11 +172,11 @@ class WsClient(threading.Thread):
         """主运行循环"""
         while self._running.is_set():
             recv_msg = self.recv_queue.get()
-            if recv_msg[0]=="update_cookies":
+            if recv_msg[0] == "update_cookies":
                 _, self.cookies, self.headers = recv_msg
                 if self.client is None:
                     self._init_client()
-            elif recv_msg[0]=="task":
+            elif recv_msg[0] == "task":
                 if self.client is None:
                     self.recv_queue.put(recv_msg)
                     self._update_cookies()
@@ -170,8 +191,9 @@ class WsClient(threading.Thread):
     def stop(self):
         """安全停止客户端"""
         self._running.clear()
-        self.client.disconnect()
-        self.client.loop_stop()
+        if self.client:
+            self.client.disconnect()
+            self.client.loop_stop()
 
     def _setup_callbacks(self):
         """配置回调函数"""
@@ -240,11 +262,25 @@ class WsClient(threading.Thread):
         while self._running.is_set():
             try:
                 self.logger.info("Attempting to reconnect...")
+                # 在重连之前，尝试刷新 cookies 和 wt2 值
+                self._update_cookies()
+                self.wt2 = get_wt2()
+                ws_headers = {
+                    "Cookie": "; ".join([f"{k}={v}" for k, v in self.cookies.items()]),
+                    "User-Agent": self.headers.get('User-Agent', ''),
+                    "Sec-WebSocket-Protocol": self.wt2
+                }
+                self.client.ws_set_options(
+                    path=self.path,
+                    headers=ws_headers
+                )
+                self.client.username_pw_set(self.token + "|0", self.wt2)
                 self.client.reconnect()
-                return
-            except Exception as e:
-                #TODO 更新token继续重连
-                self.logger.error(f"Reconnect failed: {str(e)}")
+                if self.client.is_connected:
+                    self.logger.info("Reconnect successfully")
+                    return  # 重连成功
+            except Exception as update_err:
+                self.logger.error(f"更新 token 和 wt2 失败: {update_err}")
                 time.sleep(self.reconnect_interval)
 
     def on_text_message(self, from_uid, text, timestamp):

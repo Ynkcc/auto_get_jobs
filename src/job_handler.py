@@ -49,7 +49,7 @@ class JobHandler(threading.Thread):
             result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
-            if active_status in self.inactive_keywords:
+            if active_status not in self.inactive_keywords:
                 logger.info(f"跳过{job_data['job_name']}：HR活跃状态[{active_status}]不符合要求")
                 return result
 
@@ -70,10 +70,22 @@ class JobHandler(threading.Thread):
                 result['analysis_think'] = ai_think
                 logger.info(ai_think)
 
+
             if ai_result:
+                # 判断是否启用 AI 打招呼语
+                greeting_message = None
+                if self.ai_analyzer.greeting_enable_ai:
+                    # 调用 ai_greeting 方法获取打招呼语
+                    greeting_message = await self.ai_analyzer.ai_greeting(job_requirements)
+
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
                 apply_result = await start_chat(security_id, job_id, lid)
+
+                if greeting_message:
+                    # 将打招呼语作为文本消息发送到 ws_client
+                    self.ws_queue.put(["task", ("msg", card["securityId"], card["encryptUserId"], greeting_message)])
+
                 # 还可以放入自定义信息
                 if self.resume_image_enabled:
                     self.ws_queue.put(["task",("image", card["securityId"],card["encryptUserId"], "")])
