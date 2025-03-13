@@ -39,6 +39,11 @@ def setup_logging(logging_config):
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
 
+    # 获取 selenium remote connection 的 logger 并设置 level 为 WARNING
+    selenium_logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
+    selenium_logger.setLevel(logging.WARNING)
+    urllib3_logger = logging.getLogger('urllib3.connectionpool')
+    urllib3_logger.setLevel(logging.WARNING)
 setup_logging(logging_config)
 logger = logging.getLogger(__name__)
 logger.info("test")
@@ -133,8 +138,6 @@ def main(config):
                         'User-Agent': driver.execute_script("return navigator.userAgent;")
                     }
                     SessionManager.update_session(cookies, headers)
-                    ws_queue.put(("task",["image","UgEoLMYu9WPMn-L1hqffGiml1W-xDXwHsToIb2A0_ZkapolHvCIqQWRSIJSuYmfvOsTnCYrUhYODQA08mdiDjLyFN8SwqxdkX_dtJGoI--vT-Z1b2A~~","3aa60c387c96fc671X172d66GFM~",""]))
-                    time.sleep(600)
                     job_queue.put(["tasks",jobs])
                     time.sleep(config.crawler.next_page_delay)
                     if not next_page(driver):

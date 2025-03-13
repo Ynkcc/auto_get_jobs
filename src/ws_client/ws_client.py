@@ -92,7 +92,7 @@ class WsClient(threading.Thread):
 
         # 建立连接
         try:
-            self.client.connect(self.hostname, self.port, keepalive=15)
+            self.client.connect(self.hostname, self.port, keepalive=25)
             self.client.loop_start()
         except Exception as e:
             self.logger.error(f"连接失败: {e}")

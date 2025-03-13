@@ -79,3 +79,11 @@ class BossZPInspector:
         return json_format.MessageToDict(pb_data), topic
 
 addons = [BossZPInspector()]
+
+if __name__ == '__main__':
+    inspector = BossZPInspector()
+    # 示例二进制数据 (您可以根据需要修改)
+    sample_data = bytes.fromhex("305B 0004 6368 6174 0801 1A51 0A0F 08E8 0712 001A 0022 0028 0030 0038 0012 1208 98E7 989D 0212 001A 0022 0028 0030 0038 0018 0320 0128 AAFD ACF5 D832 320A 0804 1001 3202 080A 5A00 3800 4000 5000 58AA FDAC F5D8 3260 0068 0170 0078 00") # 示例：非 PUBLISH 类型
+    content, topic = inspector._parse_binary(sample_data)
+    print("Content:", content)
+    print("Topic:", topic)
