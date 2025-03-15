@@ -5,20 +5,23 @@ EditBy : Ynkcc
 import logging
 logger = logging.getLogger(__name__)
 import socks
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 import os
 import json
-import queue
-import requests
+import aiohttp
 import paho.mqtt.client as mqtt
+import asyncio
 from .techwolf_pb2 import TechwolfChatProtocol
 from google.protobuf import json_format
 import secrets
-from utils.general import get_user_info,get_wt2,upload_image
+from utils.general import get_user_info,get_wt2,upload_image,calculate_md5
 from utils.session_manager import SessionManager
 from utils.config_manager import ConfigManager
 class WsClient(threading.Thread):
+    sent_count = 0
+    success_count = 0
     hostname = "ws6.zhipin.com"
     port = 443
     path = '/chatws'
@@ -28,7 +31,7 @@ class WsClient(threading.Thread):
     token = None
     wt2 = None
 
-    def __init__(self, recv_queue, done_event, running_event):
+    def __init__(self, recv_queue, publish_done, running_event, loop):
         """
         初始化WebSocket客户端
         :param recv_queue: 接收任务队列(Queue类型)
@@ -42,12 +45,16 @@ class WsClient(threading.Thread):
         self.logger = logger or logging.getLogger(__name__)
         self.image_dict = None
         self.client = None
-        self.done = done_event
+        self.publish_done = publish_done
         self._running = running_event
+        self.loop = loop
         config = ConfigManager.get_config()
         self.resume_image_file = config.application.resume_image_file
         self.send_resume_image = config.application.send_resume_image and os.path.exists(
             self.resume_image_file)
+        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.resume_image_data = None
+        self.resume_image_md5 = None
 
     def _update_cookies(self):
         # 从SessionManager获取最新配置
@@ -57,6 +64,13 @@ class WsClient(threading.Thread):
 
     def _init_client(self):
         client_id = f"ws-{secrets.token_hex(8).upper()}"
+        try:
+            with open(self.resume_image_file, 'rb') as f:
+                self.resume_image_md5 = calculate_md5(self.resume_image_file)
+                self.resume_image_data = f.read()
+        except Exception as e:
+            self.logger.error(f"读取简历图片失败: {e}")
+
         # MQTT客户端配置
         self.client = mqtt.Client(
             client_id=client_id,
@@ -64,7 +78,7 @@ class WsClient(threading.Thread):
             transport='websockets',
             clean_session=True
         )
-        self.client.proxy_set(proxy_type=socks.HTTP, proxy_addr="127.0.0.1", proxy_port=8888)
+        #self.client.proxy_set(proxy_type=socks.HTTP, proxy_addr="127.0.0.1", proxy_port=8888)
         self._setup_callbacks()
         try:
             self.uid, user_info = get_user_info()
@@ -72,7 +86,7 @@ class WsClient(threading.Thread):
             self.wt2 = get_wt2()
         except Exception as e:
             self.logger.error(f"获取用户信息失败, 无法初始化客户端: {e}")
-            return False  # 初始化失败
+            return False
 
         # 配置WebSocket连接
         ws_headers = {
@@ -97,15 +111,21 @@ class WsClient(threading.Thread):
         except Exception as e:
             self.logger.error(f"连接失败: {e}")
             return False
+    async def async_send_message(self, task):
+        """异步版本的消息发送方法"""
+        try:
+            await self.loop.run_in_executor(
+                self.executor, 
+                self._sync_send_message, 
+                task
+            )
+        except Exception as e:
+            self.logger.error(f"Async send failed: {str(e)}")
 
-    def send_message(self, task):
-        """
-        发送文本消息
-        :param boss_id: 对方boss_id
-        :param msg: 消息内容
-        :return:
-        """
-
+    def _sync_send_message(self, task):
+        """同步消息发送核心逻辑"""
+        # 原send_message的内容移到这里
+        msgtype, securityId, boss_id, msg = task
         def _build_base_message(boss_id):
             """构建基础消息结构"""
             timestamp = int(time.time() * 1000)
@@ -147,8 +167,9 @@ class WsClient(threading.Thread):
             elif msgtype == "image":
                 if not self.send_resume_image:
                     return
-                image_dict = upload_image(self.resume_image_file, securityId)
+                image_dict = upload_image(self.resume_image_file, securityId, self.resume_image_md5)
                 if image_dict is None:
+                    logger.debug(f'图片简历上传失败：bossid：{boss_id},securityId：{securityId}')
                     return
                 _build_image_message(chat, image_dict)
             else:
@@ -156,20 +177,21 @@ class WsClient(threading.Thread):
             protocol = TechwolfChatProtocol()
             json_format.ParseDict(chat, protocol)
             publish_content = protocol.SerializeToString()
+            self.sent_count += 1
+            self.publish_done.clear()
+            self.client.publish(self.topic, publish_content, qos=1)
 
-            if self.client and self.client.is_connected():
-                publish_result = self.client.publish(self.topic, publish_content, qos=1)
-                publish_result.wait_for_publish()
-                if publish_result.rc != mqtt.MQTT_ERR_SUCCESS:
-                    self.logger.error(f"消息发布失败: {publish_result}")
-            else:
-                self.logger.error("客户端未连接，无法发送消息")
 
         except Exception as e:
             self.logger.error(f"Failed to send application: {str(e)}")
-
+    def send_message(self, task):
+        """改为异步入口"""
+        asyncio.run_coroutine_threadsafe(self.async_send_message(task), self.loop)
     def run(self):
         """主运行循环"""
+        # self.loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(self.loop)
+        # self.loop.run_until_complete()
         while self._running.is_set():
             recv_msg = self.recv_queue.get()
             if recv_msg[0] == "update_cookies":
@@ -183,9 +205,9 @@ class WsClient(threading.Thread):
                     self._init_client()
                     continue
                 _, task = recv_msg
-                self.done.clear()
+
                 self.send_message(task)
-                self.done.set()
+
         self.stop()
 
     def stop(self):
@@ -200,6 +222,7 @@ class WsClient(threading.Thread):
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_publish = self._on_publish
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
@@ -207,6 +230,12 @@ class WsClient(threading.Thread):
             client.subscribe(self.topic)
         else:
             self.logger.error(f"Connection failed with code {rc}")
+
+    def _on_publish(self, client, userdata, mid):
+        self.success_count += 1
+        self.logger.debug(f"Message published (mid: {mid}), success_count: {self.success_count}, sent_count: {self.sent_count}")
+        if self.success_count == self.sent_count:
+            self.publish_done.set()
 
     def _on_disconnect(self, client, userdata, rc):
         self.logger.warning(f"Disconnected with code {rc}")

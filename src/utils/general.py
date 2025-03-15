@@ -21,6 +21,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from .session_manager import SessionManager
+import threading
 
 # 本地模块导入
 logger = logging.getLogger(__name__)
@@ -462,17 +463,16 @@ def full_upload_image(file_path,securityId):
         }
         return result
     except Exception:
-        logger.error(f"上传简历图片出现错误")
-        logger.exception("An error occurred")
+        logger.exception(f"上传简历图片出现错误")
         return None
 
-def quickly_upload_image(file_path,securityId):
-    #快速上传接口（若服务端已有相同文件则直接返回结果）
+def quickly_upload_image(file_md5, securityId):
+    # 快速上传接口（若服务端已有相同文件则直接返回结果）
     url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
     data = {
-        "fileMd5": calculate_md5(file_path),
-        "fileSize": os.path.getsize(file_path),
-        "source":"chat_file",
+        "fileMd5": file_md5,  # use file_md5 instead of calculate_md5(file_path)
+        "fileSize": 0,  # remove os.path.getsize(file_path),
+        "source": "chat_file",
         "securityId": securityId
     }
     session = SessionManager.get_sync_session()
@@ -499,12 +499,13 @@ def quickly_upload_image(file_path,securityId):
         result = False
     return result
 
-def upload_image(file_path,securityId):
-    quickly_upload_result=quickly_upload_image(file_path,securityId)
+
+def upload_image(file_path, securityId, resume_image_md5=None): 
+    quickly_upload_result = quickly_upload_image(resume_image_md5, securityId)
     if quickly_upload_result:
         return quickly_upload_result
     else:
-        full_upload_result=full_upload_image(file_path,securityId)
+        full_upload_result =  full_upload_image(file_path, securityId) 
         return full_upload_result
     
 

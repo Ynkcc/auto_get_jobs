@@ -58,6 +58,22 @@ from utils.db_utils import DatabaseManager
 from job_handler import JobHandler
 from ws_client.ws_client import WsClient
 from utils.session_manager import SessionManager
+import asyncio
+import concurrent.futures
+import signal
+import sys
+
+def start_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+stop_flag = asyncio.Event()
+
+def signal_handler(sig, frame):
+    logging.info(f"接收到信号 {sig}, 设置停止标志")
+    stop_flag.set()
+
+signal.signal(signal.SIGINT, signal_handler)
 
 def login(driver, account):
     """
@@ -99,6 +115,7 @@ def main(config):
 
     # 初始化并启动线程
     running_event.set()
+    ws_done.set()
     jobhandler = JobHandler(
         job_queue=job_queue,
         ws_queue=ws_queue,
@@ -106,10 +123,17 @@ def main(config):
         running_event=running_event,
     )
 
+    # 创建事件循环
+    loop = asyncio.new_event_loop()
+    # 创建一个子线程
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    loop.run_in_executor(executor, start_loop, loop)
+
     ws_client = WsClient(
         recv_queue=ws_queue,
-        done_event=ws_done,
+        publish_done=ws_done,
         running_event=running_event,
+        loop=loop
     )
 
     jobhandler.start()
@@ -140,12 +164,17 @@ def main(config):
                     SessionManager.update_session(cookies, headers)
                     job_queue.put(["tasks",jobs])
                     time.sleep(config.crawler.next_page_delay)
+                    if stop_flag.is_set():
+                        logging.info("接收到停止信号，程序将在30s内退出")
+                        ws_done.wait(30)
+                        sys.exit(0)
                     if not next_page(driver):
                         break
 
         finally:
             job_queue.join()
             ws_queue.join()
+            ws_done.wait() # 等待所有 MQTT 消息发送完成
             manager.stop_autosave()
             manager.clear_data()
 
