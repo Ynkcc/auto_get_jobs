@@ -49,7 +49,7 @@ class JobHandler(threading.Thread):
             result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
-            if active_status not in self.inactive_keywords:
+            if active_status in self.inactive_keywords:
                 logger.info(f"跳过{job_data['job_name']}：HR活跃状态[{active_status}]不符合要求")
                 return result
 

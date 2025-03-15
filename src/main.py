@@ -144,7 +144,11 @@ def main(config):
 
         try:
             url_list=list(build_search_url(config.job_search))
+            i = 1
+            total=len(url_list)
             for url in url_list:
+                logger.info(f"当前第{i}个url，共{total}个")
+                i+=1
                 driver.get(url)
                 while True:
                     try:

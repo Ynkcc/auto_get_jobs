@@ -1,6 +1,6 @@
 # config_manager.py
 from pydantic import BaseModel, ValidationError
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import yaml
 import os
 
@@ -51,18 +51,22 @@ class DatabaseConfig(BaseModel):
     filename: str
     export: DatabaseExportConfig
 
+class FilterBaseConfig(BaseModel):
+    values: List[str]
+    combine: bool
+
 class JobSearchConfig(BaseModel):
     city: List[str]
     query: List[str]
     areas: Dict[str, List[str]]
-    degree: List[str]
-    experience: List[str]
-    position: List[str]
-    industry: List[str]
+    degree: FilterBaseConfig
+    experience: FilterBaseConfig
+    position: FilterBaseConfig
+    industry: FilterBaseConfig
     salary: List[str]
     jobType: List[str]
-    scale: List[str]
-    stage: List[str]
+    scale: FilterBaseConfig
+    stage: FilterBaseConfig
 
 class AccountConfig(BaseModel):
     username: str

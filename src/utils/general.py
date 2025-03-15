@@ -197,9 +197,8 @@ def init_driver(webdriver_config) -> webdriver:
 
 def build_search_url(job_search):
     """
-    构造搜索URL
+    构造搜索URL（支持参数合并配置）
     """
-
     # 加载区域代码数据
     with open('config/search_params_config.json', 'r', encoding='utf-8') as f:
         params_data = json.load(f)
@@ -248,16 +247,24 @@ def build_search_url(job_search):
 
     base_url = "https://www.zhipin.com/web/geek/job"
 
-    # 转换到具体代码
+    def process_filter(filter_config, param_map: dict) -> List[str]:
+        """处理过滤参数合并逻辑"""
+        codes = [str(param_map[v]) for v in filter_config.values]
+        return [','.join(codes)] if filter_config.combine and codes else codes
+
+    # 构建参数配置（支持合并逻辑）
     params_config = {
-        'position': [str(params_data["position"][v]) for v in job_search.position],
-        'industry': [str(params_data["industry"][v]) for v in job_search.industry],
-        'experience': [str(params_data["experience"][v]) for v in job_search.experience],
+        # 处理需要合并参数的字段
+        'degree': process_filter(job_search.degree, params_data["degree"]),
+        'position': process_filter(job_search.position, params_data["position"]),
+        'industry': process_filter(job_search.industry, params_data["industry"]),
+        'experience': process_filter(job_search.experience, params_data["experience"]),
+        'scale': process_filter(job_search.scale, params_data["scale"]),
+        'stage': process_filter(job_search.stage, params_data["stage"]),
+        # 处理普通列表参数
         'salary': [str(params_data["salary"][v]) for v in job_search.salary],
         'jobType': [str(params_data["jobType"][v]) for v in job_search.jobType],
-        'scale': [str(params_data["scale"][v]) for v in job_search.scale],
-        'stage': [str(params_data["stage"][v]) for v in job_search.stage],
-        'query': job_search.query  # 直接使用列表
+        'query': job_search.query
     }
 
     # 过滤空参数

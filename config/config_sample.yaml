@@ -72,14 +72,26 @@ job_search:
   city: ["海口","文昌"]         # 目标城市列表（设置区域时自动忽略）
   query: ["运维"]        # 搜索关键词列表
   areas: {}            # 区域配置（示例："北京":["东城区","西城区"]）
-  degree: []      # 学历要求（不限/大专/本科/硕士/博士）
-  experience: ["1-3年","经验不限","1年以内"] # 经验要求
-  position: []         # 岗位名称过滤
-  industry: [] # 行业过滤
+  degree:
+    values: []      # 学历要求（不限/大专/本科/硕士/博士）
+    combine: false
+  experience:
+    values: ["1-3年","经验不限","1年以内"] # 经验要求
+    combine: true
+  position:
+    values: []         # 岗位名称过滤
+    combine: false
+  industry:
+    values: [] # 行业过滤
+    combine: false
   salary: []   # 薪资范围过滤（只用来过滤，薪资判断的部分使用salary_range）
   jobType: []          # 工作类型（全职/兼职）
-  scale: [] # 公司规模
-  stage: []            # 公司融资阶段
+  scale:
+    values: [] # 公司规模
+    combine: false
+  stage:
+    values: []            # 公司融资阶段
+    combine: false
 
 # =============== 账号配置 ===============
 accounts:
