@@ -11,7 +11,7 @@ crawler:
   rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
     rate: 0.5  # 每秒生成的令牌数
     capacity: 3  # 桶的容量
-  next_page_delay: 5 # 翻页延迟（秒）
+  next_page_delay: 20 # 翻页延迟（秒）
   request_timeout: 30 # 请求超时时间（秒）
   page_load_timeout: 60 # 页面加载超时时间（秒）
 
@@ -22,6 +22,14 @@ ai:
   temperature: 0.2
   api_key: "ckzNFXH0kxx8jY0ykoAJmxy4bjrlJZQikAxrSHK2raWRWQWbb2EKJQQJ99BBACHYHv6XJ3w3AAAAACOG5gdc"  
   api_url: "https://ai-evilsynk6832ai032785348492.services.ai.azure.com/models/chat/completions"  #完整url链接
+
+  # provider: "openai"   # 服务商（azure/openai） openai代表openai兼容接口
+  # model: "default"            # 模型名称记得填写
+  # temperature: 0.2
+  # api_key: ""  
+  # # api_url: "https://zhenze-huhehaote.cmecloud.cn/inference-api/exp-api/inf-1336781912337387520/v1/chat/completions"  #完整url链接
+  # api_url: "https://zhenze-huhehaote.cmecloud.cn/inference-api/exp-api/inf-1336844822260682752/v1/chat/completions"
+
   prompt: |  # AI分析提示词模板
     帮助用户判断这个岗位是否合适
     岗位应与用户简历提供的方向一致
@@ -32,7 +40,6 @@ ai:
 application:
   send_resume_image: false
   resume_image_file: "data/resume.jpg"
-  # 未实现
   greeting: 
     enable_ai: false  # 是否使用AI生成招呼语
     template: |
@@ -40,13 +47,14 @@ application:
       我对贵司的{job_name}岗位很感兴趣，
       我的技能包括：{skills}，
       期待与您进一步沟通！
-  resume_file: "./resume.pdf"  # 附件简历路径
+  # 未实现
+  resume_name: "resume.pdf" #hr请求简历时的，发送的简历名称
 
 # =============== 日志配置 ===============
 # 尚未实现
 logging:
   level: INFO      # 日志级别（DEBUG/INFO/WARNING/ERROR）
-  path: app.log    # 日志文件路径
+  path: data/app.log    # 日志文件路径
   max_size: 10     # 日志文件最大大小（MB）
 
 # =============== 数据库配置 ===============

@@ -11,3 +11,4 @@ pyyaml
 openpyxl
 paho-mqtt
 protobuf==5.29.3
+requests_toolbelt

@@ -1,22 +1,87 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.common.exceptions import TimeoutException 
+# File: main.py
+from utils.config_manager import ConfigManager
+import logging
+from logging.handlers import RotatingFileHandler
+
+# 加载配置
+ConfigManager.load_config("config/config.yaml")
+config = ConfigManager.get_config()
+
+# 配置日志
+logging_config = config.logging
+# 修改 main.py 中的 setup_logging 函数
+def setup_logging(logging_config):
+    """
+    配置日志系统
+    """
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging_config.level)
+    console_handler.setFormatter(formatter)
+
+    # 文件处理器（使用 RotatingFileHandler 替代 FileHandler）
+    file_handler = RotatingFileHandler(
+        filename=logging_config.path,
+        mode='a',
+        maxBytes=logging_config.max_size * 1024 * 1024,  # 转换为字节
+        backupCount=5,  # 保持5个备份文件
+        encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    # 获取根日志器并配置
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
+
+    # 获取 selenium remote connection 的 logger 并设置 level 为 WARNING
+    selenium_logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
+    selenium_logger.setLevel(logging.WARNING)
+    urllib3_logger = logging.getLogger('urllib3.connectionpool')
+    urllib3_logger.setLevel(logging.WARNING)
+setup_logging(logging_config)
+logger = logging.getLogger(__name__)
+logger.info("test")
+
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
-from dotenv import load_dotenv
-import time
 import sys
-from multiprocessing import Process, Queue, Event
+from queue import Queue
+import threading
 from utils.general import *
 from utils.db_utils import DatabaseManager
-from job_processor import JobProcessor
+from job_handler import JobHandler
+from ws_client.ws_client import WsClient
+from utils.session_manager import SessionManager
+import asyncio
+import concurrent.futures
+import signal
+import sys
 
-def login(driver,account):
+def start_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+stop_flag = asyncio.Event()
+
+def signal_handler(sig, frame):
+    logging.info(f"接收到信号 {sig}, 设置停止标志")
+    stop_flag.set()
+
+signal.signal(signal.SIGINT, signal_handler)
+
+def login(driver, account):
     """
     登录BOSS直聘
     """
-    account_name =account.get("username")
+    account_name =account.username
     login_file=f"./data/{account_name}.json"
-    manager = SessionManager(driver, login_file)
+    manager = BrowserSessionHandler(driver, login_file)
     #登录URl
     login_url = "https://www.zhipin.com/web/user/?ka=header-login"
     driver.get(login_url)
@@ -38,97 +103,80 @@ def login(driver,account):
     print(f"登陆成功。")
     return manager
 
-def main_loop(driver, config):
+def main(config):
+    driver = init_driver(config.crawler.webdriver)
 
-    # 从配置中获取参数
-    databaseFileName = config['database']['filename']
-    job_search =config['job_search']
-    crawler_config = config['crawler']
-    page_load_timeout=crawler_config.get("page_load_timeout", 60)
-    next_page_delay=crawler_config.get("next_page_delay", 5)
-    minSalary,_ = config["job_check"]["salary_range"]
-    send_resume_image = config['application']["send_resume_image"]
-    resume_image_file = config['application']["resume_image_file"]
-    resume_image_dict=None
-    if send_resume_image and os.path.exists(resume_image_file):
-        resume_image_dict=upload_image(driver,resume_image_file)
-    
-    userId, _ =getUserInfo(driver)
-    db_manager = DatabaseManager(databaseFileName,userId)
-    recv_queue = Queue()
-    comm_queue = Queue()
-    done_event = Event()
-    processor = JobProcessor(comm_queue,recv_queue,done_event,config,resume_image_dict)  # 传入db_queue
-    
-    # 启动处理进程
-    process = Process(target=processor.start_processing)
-    process.start()
+    # 创建共享队列和事件
+    job_queue = Queue()
+    job_done = threading.Event()
+    ws_queue = Queue()
+    ws_done = threading.Event()
+    running_event = threading.Event()
 
-    try:
-        for targetUrl in buildSearchUrl(job_search):
+    # 初始化并启动线程
+    running_event.set()
+    ws_done.set()
+    jobhandler = JobHandler(
+        job_queue=job_queue,
+        ws_queue=ws_queue,
+        done_event=job_done,
+        running_event=running_event,
+    )
 
-            driver.get(targetUrl)            
-            while True:
-                try:
-                    # 等待页面加载
-                    WebDriverWait(driver, page_load_timeout).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
-                    )
-                except TimeoutException:
-                    print("获取页面职位超时，可能无岗位或被封禁")
-                    break
-                # 获取并过滤当前页职位
-                jobs = getPageJobsInfo(driver)
-                valid_jobs = filterJobsBySalary(jobs, minSalary)
-                #过滤访问过的
-                valid_jobs = db_manager.filterVisited(valid_jobs,userId)
-                jobsDetails=None
-                if valid_jobs:
+    # 创建事件循环
+    loop = asyncio.new_event_loop()
+    # 创建一个子线程
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    loop.run_in_executor(executor, start_loop, loop)
 
-                    # 获取 cookies 和 headers
-                    cookies = driver.get_cookies()
-                    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+    ws_client = WsClient(
+        recv_queue=ws_queue,
+        publish_done=ws_done,
+        running_event=running_event,
+        loop=loop
+    )
+
+    jobhandler.start()
+    ws_client.start()
+
+    for account in config.accounts:
+        manager = login(driver, account)
+
+        try:
+            url_list=list(build_search_url(config.job_search))
+            for url in url_list:
+                driver.get(url)
+                while True:
+                    try:
+                        # 等待页面加载
+                        WebDriverWait(driver, config.crawler.page_load_timeout).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
+                        )
+                    except TimeoutException:
+                        print("获取页面职位超时，可能无岗位或被封禁")
+                        break
+
+                    jobs = get_page_jobs_info(driver)
+                    cookies = {cookie['name']: cookie['value'] for cookie in driver.get_cookies()}
                     headers = {
                         'User-Agent': driver.execute_script("return navigator.userAgent;")
                     }
-                    # 发送当前批次任务
-                    comm_queue.put({
-                        "jobs": valid_jobs,
-                        "cookies": cookies_dict,
-                        "headers": headers
-                    })
-                    done_event.clear()  # 重置事件状态
-                    
-                    # 等待本批次处理完成
-                    while not done_event.wait(timeout=60):
-                        print("Waiting for batch processing...")
-                        time.sleep(5)
-                    jobsDetails = recv_queue.get()
-                #存放到数据库
-                # save_jobs_to_csv(jobsDetails,"jobsDetails.csv")
-                # save_jobs_to_csv(jobs,"jobs.csv")
-                db_manager.save_jobs_details(jobs,jobsDetails)
-                
-                # 翻页逻辑
-                time.sleep(next_page_delay)
-                if not nextPage(driver):
-                    break
+                    SessionManager.update_session(cookies, headers)
+                    job_queue.put(["tasks",jobs])
+                    time.sleep(config.crawler.next_page_delay)
+                    if stop_flag.is_set():
+                        logging.info("接收到停止信号，程序将在30s内退出")
+                        ws_done.wait(30)
+                        sys.exit(0)
+                    if not next_page(driver):
+                        break
 
-    finally:
-        # 发送终止信号并等待进程结束
-        comm_queue.put(None)
-        process.join(timeout=30)
+        finally:
+            job_queue.join()
+            ws_queue.join()
+            ws_done.wait() # 等待所有 MQTT 消息发送完成
+            manager.stop_autosave()
+            manager.clear_data()
 
-
-def main():
-    config=load_config("config/config.yaml")
-    driver=init_driver(config['crawler']["webdriver"])
-    for account in config['accounts']:
-        manager=login(driver,account)
-        main_loop(driver,config)
-        manager.stop_autosave()
-        manager.clear_data()
-
-
-if __name__=="__main__":
-    main()
+if __name__=='__main__':
+    main(config)
