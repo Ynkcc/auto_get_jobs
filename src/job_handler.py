@@ -11,7 +11,7 @@ from utils.db_utils import DatabaseManager
 
 class JobHandler(threading.Thread):
     def __init__(self, job_queue: queue.Queue, ws_queue: queue.Queue, done_event, running_event, ):
-        super().__init__(daemon=True)
+        super().__init__(daemon=True,name="job_hander")
         self.job_queue = job_queue
         self.ws_queue = ws_queue
         self.done_event = done_event
@@ -126,7 +126,7 @@ class JobHandler(threading.Thread):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
-        while self.running_event:
+        while self.running_event.is_set():
             batch = self.job_queue.get()
             if batch[0]=="update_cookies":
                 _, self.cookies, self.headers = batch
@@ -153,3 +153,4 @@ class JobHandler(threading.Thread):
                 results = [result for result in results if result is not None]
                 self.db_manager.save_jobs_details(jobs_batch,results)
                 self.done_event.set()
+                self.job_queue.task_done()

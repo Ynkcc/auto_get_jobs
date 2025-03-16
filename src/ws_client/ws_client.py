@@ -38,7 +38,7 @@ class WsClient(threading.Thread):
         :param headers: 请求头字典
         :param cookies: cookies字典
         """
-        super().__init__(daemon=True)
+        super().__init__(daemon=True,name="ws_client")
         self.recv_queue = recv_queue
         self.headers = None
         self.cookies = None
@@ -194,6 +194,7 @@ class WsClient(threading.Thread):
         # self.loop.run_until_complete()
         while self._running.is_set():
             recv_msg = self.recv_queue.get()
+            self.recv_queue.task_done()
             if recv_msg[0] == "update_cookies":
                 _, self.cookies, self.headers = recv_msg
                 if self.client is None:

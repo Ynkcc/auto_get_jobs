@@ -181,6 +181,7 @@ def main(config):
             ws_done.wait() # 等待所有 MQTT 消息发送完成
             manager.stop_autosave()
             manager.clear_data()
-
+    running_event.clear()
+    sys.exit(0)
 if __name__=='__main__':
     main(config)
