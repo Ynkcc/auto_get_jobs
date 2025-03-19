@@ -131,26 +131,26 @@ class JobHandler(threading.Thread):
             if batch[0]=="update_cookies":
                 _, self.cookies, self.headers = batch
             elif batch[0]=="tasks":
+                self.done_event.clear()
                 _, jobs_batch = batch
                 # 满足薪资要求的岗位
-                jobs_batch = filter_jobs_by_salary(jobs_batch, self.min_salary)
+                filter_salary_jobs = filter_jobs_by_salary(jobs_batch, self.min_salary)
                 # 未被访问过的岗位
-                unvisited_jobs = self.db_manager.filter_visited(jobs_batch)
-                
-                self.done_event.clear()
-                try:
-                    results = self.loop.run_until_complete(
-                        asyncio.wait_for(
-                            self._process_batch(unvisited_jobs),
-                            timeout=900  # 单位：秒
+                unvisited_jobs = self.db_manager.filter_visited(filter_salary_jobs)
+                results = []
+                if unvisited_jobs:
+                    try:
+                        results = self.loop.run_until_complete(
+                            asyncio.wait_for(
+                                self._process_batch(unvisited_jobs),
+                                timeout=900  # 单位：秒
+                            )
                         )
-                    )
-                    logger.info(f"Processed batch with {len(results)} jobs")
-                except asyncio.TimeoutError:
-                    logger.info("Batch processing timed out after 600 seconds")
-                    results = []  # 超时后的处理逻辑
-                
-                results = [result for result in results if result is not None]
+                        logger.info(f"Processed batch with {len(results)} jobs")
+                        results = [result for result in results if result is not None]
+                    except asyncio.TimeoutError:
+                        logger.info("Batch processing timed out after 600 seconds")
+                        results = []
                 self.db_manager.save_jobs_details(jobs_batch,results)
                 self.done_event.set()
                 self.job_queue.task_done()

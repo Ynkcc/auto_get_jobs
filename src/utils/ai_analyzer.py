@@ -66,7 +66,8 @@ class AiAnalyzer:
                     "messages": [
                         {"role": "system", "content": "你是一个友好的求职助手，请根据以下职位信息生成一段简洁明了的打招呼语，突出求职者的优势和对职位的兴趣。请参考以下模版: " + self.greeting_template},
                         {"role": "user", "content": f"职位信息：{job_detail}"},
-                        {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"}
+                        {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"},
+                        {"role":"user","content":"输出内容仅包含打招呼语"}
                     ],
                     "temperature": self.temperature,
                 }

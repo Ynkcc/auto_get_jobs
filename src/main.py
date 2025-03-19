@@ -143,7 +143,7 @@ def main(config):
         manager = login(driver, account)
 
         try:
-            url_list=list(build_search_url(config.job_search))
+            url_list=build_search_url(config.job_search)
             i = 1
             total=len(url_list)
             for url in url_list:

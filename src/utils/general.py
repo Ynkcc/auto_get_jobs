@@ -7,6 +7,7 @@ import re
 import threading
 import time
 from typing import List, Dict
+import itertools
 
 # 第三方库导入
 import asyncio
@@ -270,30 +271,38 @@ def build_search_url(job_search):
     # 过滤空参数
     params_config = {k: v for k, v in params_config.items() if v}
 
-    # 生成参数组合
-    for city_code, districts in location_dicts.items():
-        for district in districts:
-            base_params = {'city': city_code, 'areaBusiness': district}
+    url_list = []
+    base_params_list = []
+    for city_code in location_dicts.keys():
+        if not location_dicts[city_code]:
+            base_params_list.append({'city': city_code})
+            continue
+        for district in location_dicts[city_code]:
+            base_params_list.append({'city': city_code, 'areaBusiness': district})
+
+    if not params_config:  # 无过滤参数的特殊情况处理
+        for params in base_params_list:
+            param_str = '&'.join(f"{k}={v}" for k, v in params.items())
+            url_list.append(f"{base_url}?{param_str}")
+        return url_list
+    
+    # 生成参数组合的笛卡尔积
+    param_keys = list(params_config.keys())
+    param_combinations = list(itertools.product(*params_config.values()))
+
+    # 合并基础参数和过滤参数
+    for base_param in base_params_list:
+        for combination in param_combinations:
+            merged_params = base_param.copy()
+            merged_params.update(zip(param_keys, combination))
             
-            if not params_config:
-                yield f"{base_url}?city={city_code}&areaBusiness={district}"
-                continue
+            # 生成排序后的URL参数
+            sorted_params = sorted(merged_params.items())
+            param_str = '&'.join(f"{k}={v}" for k, v in sorted_params)
+            url_list.append(f"{base_url}?{param_str}")
+    
+    return url_list
 
-            # 递归生成参数组合
-            def generate_params(keys: List[str], values: List[List[str]], index: int = 0, current: dict = None):
-                current = current.copy() if current else base_params.copy()
-                if index == len(keys):
-                    param_str = '&'.join(f"{k}={v}" for k, v in sorted(current.items()))
-                    yield f"{base_url}?{param_str}"
-                else:
-                    for value in values[index]:
-                        current[keys[index]] = value
-                        yield from generate_params(keys, values, index + 1, current)
-
-            yield from generate_params(
-                keys=list(params_config.keys()),
-                values=list(params_config.values())
-            )
 
 def get_page_jobs_info(driver):
     jobs = []
