@@ -17,12 +17,9 @@ import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 import mimetypes
 import yaml
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from .session_manager import SessionManager
-import threading
+from playwright.async_api import async_playwright, Page
+from utils.session_manager import SessionManager
+import asyncio
 
 # 本地模块导入
 logger = logging.getLogger(__name__)
@@ -46,29 +43,31 @@ def save_jobs_to_csv(jobs: List[Dict], filename: str = 'jobs.csv') -> None:
 
 
 class BrowserSessionHandler:
-    def __init__(self, driver, login_data_file):
-        self.driver = driver
+    def __init__(self, page: Page, login_data_file: str, loop: asyncio.AbstractEventLoop):
+        self.page = page
         self.login_data_file = login_data_file
-        self.save_thread = None
-        self.stop_event = threading.Event()
+        self.save_task = None
+        self.loop = loop
 
-    def load(self) -> bool:
+    async def load(self) -> bool:
         """加载登录数据"""
         try:
             with open(self.login_data_file, "r", encoding="utf-8") as f:
                 login_data = json.load(f)
 
-            self.driver.delete_all_cookies()
-            for cookie in login_data["cookies"]:
-                self.driver.add_cookie(cookie)
+            await self.page.context.clear_cookies()
+            if login_data.get("cookies"):
+                await self.page.context.add_cookies(login_data["cookies"])
 
-            self.driver.execute_script("window.localStorage.clear();")
-            for k, v in login_data["localStorage"].items():
-                self.driver.execute_script(f"localStorage.setItem('{k}', '{v}');")
+            await self.page.evaluate("() => localStorage.clear()")
+            if login_data.get("localStorage"):
+                for k, v in login_data["localStorage"].items():
+                    await self.page.evaluate(f"() => localStorage.setItem('{k}', '{v}')")
 
-            self.driver.execute_script("window.sessionStorage.clear();")
-            for k, v in login_data["sessionStorage"].items():
-                self.driver.execute_script(f"sessionStorage.setItem('{k}', '{v}');")
+            await self.page.evaluate("() => sessionStorage.clear()")
+            if login_data.get("sessionStorage"):
+                for k, v in login_data["sessionStorage"].items():
+                    await self.page.evaluate(f"() => sessionStorage.setItem('{k}', '{v}')")
 
             logger.info("登录数据已加载")
             return True
@@ -79,16 +78,20 @@ class BrowserSessionHandler:
             logger.error(f"加载失败: {str(e)}")
             return False
 
-    def save(self) -> bool:
+    async def save(self) -> bool:
         """保存登录数据"""
         try:
             directory = os.path.dirname(self.login_data_file)
             os.makedirs(directory, exist_ok=True)
 
+            cookies = await self.page.context.cookies()
+            local_storage = await self.page.evaluate("() => Object.assign({}, localStorage)")
+            session_storage = await self.page.evaluate("() => Object.assign({}, sessionStorage)")
+
             login_data = {
-                "cookies": self.driver.get_cookies(),
-                "localStorage": self.driver.execute_script("return Object.assign({}, localStorage);"),
-                "sessionStorage": self.driver.execute_script("return Object.assign({}, sessionStorage);")
+                "cookies": cookies,
+                "localStorage": local_storage,
+                "sessionStorage": session_storage
             }
 
             with open(self.login_data_file, "w", encoding="utf-8") as f:
@@ -100,32 +103,32 @@ class BrowserSessionHandler:
             logger.error(f"保存失败: {str(e)}")
             return False
 
-    def start_autosave(self, interval=60):
-        """启动定时保存线程"""
-        def saver_loop():
-            while not self.stop_event.is_set():
-                self.save()
-                time.sleep(interval)
+    async def start_autosave(self, interval=60):
+        """启动定时保存任务"""
+        async def saver():
+            while True:
+                await self.save()
+                await asyncio.sleep(interval)
 
-        if not self.save_thread or not self.save_thread.is_alive():
-            self.stop_event.clear()
-            self.save_thread = threading.Thread(target=saver_loop, daemon=True)
-            self.save_thread.start()
-            logger.info("自动保存已启动")
+        self.save_task = asyncio.create_task(saver())
+        logger.info("自动保存已启动")
 
-    def stop_autosave(self):
-        """停止定时保存线程"""
-        if self.save_thread and self.save_thread.is_alive():
-            self.stop_event.set()
-            self.save_thread.join(timeout=5)
+    async def stop_autosave(self):
+        """停止定时保存任务"""
+        if self.save_task:
+            self.save_task.cancel()
+            try:
+                await self.save_task
+            except asyncio.CancelledError:
+                pass
             logger.info("自动保存已停止")
 
-    def clear_data(self) -> bool:
+    async def clear_data(self) -> bool:
         """清除浏览器数据"""
         try:
-            self.driver.delete_all_cookies()
-            self.driver.execute_script("window.localStorage.clear();")
-            self.driver.execute_script("window.sessionStorage.clear();")
+            await self.page.context.clear_cookies()
+            await self.page.evaluate("() => localStorage.clear()")
+            await self.page.evaluate("() => sessionStorage.clear()")
             logger.info("浏览器数据已清空，可重新登录")
             return True
         except Exception as e:
@@ -133,65 +136,51 @@ class BrowserSessionHandler:
             return False
 
 
-def init_driver(webdriver_config) -> webdriver:
+async def init_driver(webdriver_config):
     """
-    初始化 WebDriver
+    初始化 Playwright 浏览器
     :param webdriver_config: WebDriver配置对象
-    :return: WebDriver 实例
+    :return: Playwright 浏览器实例
     """
     browser_type = webdriver_config.browser_type.lower()
 
-    if browser_type == "edge":
-        from selenium.webdriver.edge.options import Options as EdgeOptions
-        from selenium.webdriver.edge.service import Service as EdgeService
-        
-        options = EdgeOptions()
-        driver_path = webdriver_config.edge_driver_path
-        ServiceClass = EdgeService
-    else:  # 默认使用 Chrome
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        options = ChromeOptions()
-        driver_path = webdriver_config.chrome_driver_path
-        ServiceClass = ChromeService
-
-    # 公共配置项
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                         'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
-    options.add_experimental_option('excludeSwitches', ['enable-automation'])
-    options.add_argument('--log-level=3')  # 只记录严重错误
-
-    # 浏览器特定配置
-    log_prefs = {'performance': 'OFF'}
-    if browser_type == "edge":
-        options.set_capability('ms:loggingPrefs', log_prefs)
-    else:
-        options.set_capability('goog:loggingPrefs', log_prefs)
-
-    # 无头模式配置
-    if webdriver_config.headless:
-        options.add_argument("--headless=new")
-        options.add_argument("window-size=1920,1080")
-
-    # 用户数据目录配置
-    if webdriver_config.use_default_data_dir:
-        data_dir = (
-            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data')
-            if browser_type == "edge"
-            else os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data')
-        )
-        options.add_argument(f"user-data-dir={data_dir}")
-        logger.info(f"{browser_type.capitalize()} 用户数据目录设置为: {data_dir}")
-
-    # 初始化浏览器实例
     try:
-        driver = (
-            webdriver.Edge(service=ServiceClass(executable_path=driver_path), options=options)
-            if browser_type == "edge"
-            else webdriver.Chrome(service=ServiceClass(executable_path=driver_path), options=options)
-        )
-        return driver
+        playwright = await async_playwright().start()
+
+        if browser_type == "edge" or browser_type == "chromium":
+            browser = await playwright.chromium.launch(
+                headless=webdriver_config.headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',  # 只记录严重错误
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+        elif browser_type == "firefox":
+            browser = await playwright.firefox.launch(
+                headless=webdriver_config.headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',  # 只记录严重错误
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+        elif browser_type == "webkit":
+            browser = await playwright.webkit.launch(
+                headless=webdriver_config.headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',  # 只记录严重错误
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+        else:
+            raise ValueError(f"不支持的浏览器类型: {browser_type}")
+
+        context = await browser.new_context()
+        page = await context.new_page()
+        return page
+
     except Exception as e:
         logger.error(f"浏览器初始化失败: {str(e)}")
         raise
@@ -304,24 +293,22 @@ def build_search_url(job_search):
     return url_list
 
 
-def get_page_jobs_info(driver):
+async def get_page_jobs_info(page: Page):
     jobs = []
-    html_content = driver.page_source
-    soup = BeautifulSoup(html_content, "html.parser")
-    # 找到所有的岗位信息块
-    job_cards = soup.find_all('li', class_='job-card-wrapper')
-    # print(job_cards)
+    job_cards = page.locator('li.job-card-wrapper')
+    count = await job_cards.count()
 
-    for job_card in job_cards:
-        job_name = job_card.find('span', class_="job-name").text.strip()
-        job_salary = job_card.find('span', class_="salary").text.strip()
-        job_link = job_card.find('a', class_='job-card-left')['href']
-        # 公司名称
-        company_name = job_card.find('h3', class_='company-name').text.strip()
-        # 公司标签列表
-        company_tag_list = job_card.find('ul', class_='company-tag-list')
-        company_tags = [tag.text.strip() for tag in company_tag_list.find_all('li')] if company_tag_list else []
-        # 将提取的信息添加到 jobs 列表中
+    for i in range(count):
+        job_card = job_cards.nth(i)
+        job_name = await job_card.locator('span.job-name').inner_text()
+        job_salary = await job_card.locator('span.salary').inner_text()
+        job_link = await job_card.locator('a.job-card-left').get_attribute('href')
+        company_name = await job_card.locator('h3.company-name').inner_text()
+        company_tags = []
+        company_tag_list = job_card.locator('ul.company-tag-list')
+        if await company_tag_list.count() > 0:
+            tag_elements = await company_tag_list.locator('li').all_inner_texts()
+            company_tags = tag_elements
         jobs.append({
             'job_name': job_name,
             'job_salary': job_salary,
@@ -329,20 +316,20 @@ def get_page_jobs_info(driver):
             'company_name': company_name,
             'company_tags': company_tags
         })
-
-    # 打印当前岗位数量（可选）
-    # print(f"当前岗位数量：{len(jobs)}")
     return jobs
 
 
-def next_page(driver):
+async def next_page(page: Page):
     try:
-        next_page_button = driver.find_element(By.CLASS_NAME, "ui-icon-arrow-right")
+        # 使用 Playwright 的选择器
+        next_page_button = page.locator(".ui-icon-arrow-right")
         print("开始采集下一页")
-        if "disabled" in next_page_button.find_element(By.XPATH, "..").get_attribute("class"):
+        # 判断按钮是否禁用
+        if "disabled" in (await next_page_button.locator("xpath=..").get_attribute("class")):
             print("没有下一页了，退出循环。")
             return False
-        driver.execute_script("arguments[0].click();", next_page_button)
+        # 点击下一页按钮
+        await next_page_button.click()
         return True
     except Exception:
         print("可能找不到下一页，退出循环。")

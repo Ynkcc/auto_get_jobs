@@ -9,9 +9,9 @@ crawler:
     headless: false
     use_default_data_dir: false #使用默认的用户配置文件目录，不建议非开发者打开
   rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
-    rate: 0.5  # 每秒生成的令牌数
+    rate: 1  # 每秒生成的令牌数
     capacity: 3  # 桶的容量
-  next_page_delay: 20 # 翻页延迟（秒）
+  next_page_delay: 30 # 翻页延迟（秒）
   request_timeout: 30 # 请求超时时间（秒）
   page_load_timeout: 60 # 页面加载超时时间（秒）
 

@@ -46,10 +46,9 @@ def setup_logging(logging_config):
     urllib3_logger.setLevel(logging.WARNING)
 setup_logging(logging_config)
 logger = logging.getLogger(__name__)
-logger.info("test")
 
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support import expected_conditions as EC
+# from selenium.common.exceptions import TimeoutException # no need
+# from selenium.webdriver.support import expected_conditions as EC # no need
 import sys
 from queue import Queue
 import threading
@@ -62,8 +61,9 @@ import asyncio
 import concurrent.futures
 import signal
 import sys
+from playwright.async_api import async_playwright, TimeoutError
 
-def start_loop(loop):
+async def start_loop(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
@@ -75,36 +75,36 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
-def login(driver, account):
+async def login(page, account,loop):
     """
     登录BOSS直聘
     """
     account_name =account.username
     login_file=f"./data/{account_name}.json"
-    manager = BrowserSessionHandler(driver, login_file)
+    manager = BrowserSessionHandler(page, login_file,loop)
     #登录URl
     login_url = "https://www.zhipin.com/web/user/?ka=header-login"
-    driver.get(login_url)
+    await page.goto(login_url)
 
     #等待用户登录
     print(f"等待登陆...")
     #加载cookies
-    if manager.load():
-        driver.refresh()
+    if await manager.load():
+        await page.reload()  # Use reload instead of refresh
     try:
-        WebDriverWait(driver, timeout="600").until(
-                EC.presence_of_element_located((By.XPATH, '//a[@ka="header-username"]'))
-            )
-    except TimeoutException:
-        driver.quit()
+        # Instead of WebDriverWait, use Playwright's wait_for_selector
+        await page.locator('a[ka="header-username"]').wait_for(timeout=600000) # timeout in milliseconds
+    except TimeoutError:
         print("登录超时，程序自动退出")
+        # page.context.browser.close() # close browser context instead of driver
         sys.exit(1)
-    manager.start_autosave()
+    await manager.start_autosave()
+    await manager.save()
     print(f"登陆成功。")
     return manager
 
-def main(config):
-    driver = init_driver(config.crawler.webdriver)
+async def main(config):
+    page = await init_driver(config.crawler.webdriver)
 
     # 创建共享队列和事件
     job_queue = Queue()
@@ -124,7 +124,7 @@ def main(config):
     )
 
     # 创建事件循环
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     # 创建一个子线程
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     loop.run_in_executor(executor, start_loop, loop)
@@ -140,7 +140,8 @@ def main(config):
     ws_client.start()
 
     for account in config.accounts:
-        manager = login(driver, account)
+        # manager = login(driver, account)
+        manager = await login(page, account,loop)
 
         try:
             url_list=build_search_url(config.job_search)
@@ -149,39 +150,40 @@ def main(config):
             for url in url_list:
                 logger.info(f"当前第{i}个url，共{total}个")
                 i+=1
-                driver.get(url)
+                # driver.get(url)
+                await page.goto(url)
                 while True:
                     try:
-                        # 等待页面加载
-                        WebDriverWait(driver, config.crawler.page_load_timeout).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, "job-card-wrapper"))
-                        )
-                    except TimeoutException:
+                        await page.locator(".job-list-box").wait_for(timeout=config.crawler.page_load_timeout*1000)
+                    except TimeoutError:
                         print("获取页面职位超时，可能无岗位或被封禁")
                         break
 
-                    jobs = get_page_jobs_info(driver)
-                    cookies = {cookie['name']: cookie['value'] for cookie in driver.get_cookies()}
+                    jobs = await get_page_jobs_info(page)
+                    cookies = {cookie['name']: cookie['value'] for cookie in  await page.context.cookies()}
                     headers = {
-                        'User-Agent': driver.execute_script("return navigator.userAgent;")
+                        # 'User-Agent': driver.execute_script("return navigator.userAgent;")
+                        'User-Agent': await page.evaluate("() => navigator.userAgent")
                     }
                     SessionManager.update_session(cookies, headers)
                     job_queue.put(["tasks",jobs])
-                    time.sleep(config.crawler.next_page_delay)
+                    await asyncio.sleep(config.crawler.next_page_delay)
                     if stop_flag.is_set():
                         logging.info("接收到停止信号，程序将在30s内退出")
                         ws_done.wait(30)
                         sys.exit(0)
-                    if not next_page(driver):
+                    # if not next_page(driver):
+                    if not await next_page(page):
                         break
 
         finally:
             job_queue.join()
             ws_queue.join()
             ws_done.wait() # 等待所有 MQTT 消息发送完成
-            manager.stop_autosave()
-            manager.clear_data()
+            await manager.stop_autosave()
+            await manager.clear_data()
+            await page.context.close()
     running_event.clear()
     sys.exit(0)
 if __name__=='__main__':
-    main(config)
+    asyncio.run(main(config))

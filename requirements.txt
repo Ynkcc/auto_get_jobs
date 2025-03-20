@@ -2,13 +2,12 @@ aiohttp
 pandas
 python-dotenv
 opentelemetry-api
-beautifulsoup4
 pdf2image
 Requests
-selenium
 sqlalchemy
 pyyaml
 openpyxl
 paho-mqtt
 protobuf==5.29.3
 requests_toolbelt
+playwright
