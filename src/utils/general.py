@@ -8,6 +8,7 @@ import threading
 import time
 from typing import List, Dict
 import itertools
+from urllib.parse import urlencode
 
 # 第三方库导入
 import asyncio
@@ -284,12 +285,9 @@ def build_search_url(job_search):
         for combination in param_combinations:
             merged_params = base_param.copy()
             merged_params.update(zip(param_keys, combination))
-            
-            # 生成排序后的URL参数
-            sorted_params = sorted(merged_params.items())
-            param_str = '&'.join(f"{k}={v}" for k, v in sorted_params)
+            param_str = urlencode(merged_params)
             url_list.append(f"{base_url}?{param_str}")
-    
+
     return url_list
 
 
@@ -344,34 +342,72 @@ def filter_jobs_by_salary(jobs: List[Dict], expected_salary: float) -> List[Dict
     :return: 符合条件的岗位列表
     """
     jobs_matching_salary = []
+    
     for job in jobs:
         job_name = job['job_name']
         job_salary = job['job_salary']
+        original_salary = job_salary  # 保留原始值用于日志
+        try:
+            # 预处理：去除类似"·13薪"的后缀
+            job_salary = re.sub(r'·\d+薪', '', job_salary)
+            
+            # 统一转换为小写方便处理
+            salary_str = job_salary.lower()
+            
+            if '元/天' in salary_str:
+                # 日薪处理（按22工作日/月）
+                daily = salary_str.replace('元/天', '')
+                daily_range = [float(x) for x in daily.split('-')]
+                min_d = daily_range[0]
+                max_d = daily_range[-1]  # 处理单值和范围
+                min_monthly = min_d * 22 / 1000
+                max_monthly = max_d * 22 / 1000
 
-        # 使用正则表达式去除类似 "·13薪" 的后缀
-        job_salary = re.sub(r'·\d+薪', '', job_salary)
+            elif 'k' in salary_str:
+                # K表示的月薪
+                k_str = salary_str.replace('k', '')
+                k_range = [float(x) for x in k_str.split('-')]
+                min_monthly = k_range[0]
+                max_monthly = k_range[-1]
 
-        # 解析薪资范围
-        if '元/天' in job_salary:
-            daily_salary = job_salary.replace('元/天', '')
-            daily_salary_range = daily_salary.split('-')
-            min_daily_salary = int(daily_salary_range[0])
-            max_daily_salary = int(daily_salary_range[1]) if len(daily_salary_range) > 1 else min_daily_salary
-            min_monthly_salary = min_daily_salary * 22 / 1000  # 转换为 K
-            max_monthly_salary = max_daily_salary * 22 / 1000  # 转换为 K
-        elif "k" in job_salary or "K" in job_salary:
-            salary_range = job_salary.replace('K', '').replace('k', '').split('-')
-            min_monthly_salary = float(salary_range[0])
-            max_monthly_salary = float(salary_range[1]) if len(salary_range) > 1 else min_monthly_salary
-        else:
-            logger.warning(f"薪资格式错误 招聘岗位: {job_name} | {job_salary}")
+            elif '元/月' in salary_str:
+                # 直接月薪
+                monthly = salary_str.replace('元/月', '')
+                monthly_range = [float(x) for x in monthly.split('-')]
+                min_monthly = monthly_range[0] / 1000
+                max_monthly = monthly_range[-1] / 1000
+
+            elif '元/周' in salary_str:
+                # 周薪处理（按4周/月）
+                weekly = salary_str.replace('元/周', '')
+                weekly_range = [float(x) for x in weekly.split('-')]
+                min_monthly = weekly_range[0] * 4 / 1000
+                max_monthly = weekly_range[-1] * 4 / 1000
+
+            elif '元/时' in salary_str:
+                # 时薪处理（按8小时/天，22天/月）
+                hourly = salary_str.replace('元/时', '')
+                hourly_range = [float(x) for x in hourly.split('-')]
+                min_monthly = hourly_range[0] * 8 * 22 / 1000
+                max_monthly = hourly_range[-1] * 8 * 22 / 1000
+
+            else:
+                logger.warning(f"未知薪资格式 | 岗位: {job_name} | 薪资: {original_salary}")
+                continue
+        except (ValueError, IndexError) as e:
+            logger.warning(f"薪资解析失败 | 岗位: {job_name} | 原始值: {original_salary} | 错误: {str(e)}")
+            continue
+        except Exception as e:
+            logger.error(f"意外错误处理薪资 | 岗位: {job_name} | 错误: {str(e)}")
             continue
 
-        # 判断薪资是否满足条件
-        if min_monthly_salary >= expected_salary:
+        # 薪资判断逻辑
+        if min_monthly >= expected_salary:
             jobs_matching_salary.append(job)
+            logger.debug(f"符合条件 | 岗位: {job_name} | 范围: {min_monthly:.1f}-{max_monthly:.1f}K")
         else:
-            logger.info(f"薪资太低 招聘岗位: {job_name} | {job_salary}")
+            logger.info(f"薪资不足 | 岗位: {job_name} | 当前范围: {min_monthly:.1f}-{max_monthly:.1f}K")
+
     return jobs_matching_salary
 
 

@@ -126,8 +126,9 @@ async def main(config):
     # 创建事件循环
     loop = asyncio.get_event_loop()
     # 创建一个子线程
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
-    loop.run_in_executor(executor, start_loop, loop)
+    # executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    # loop.run_in_executor(executor, start_loop, loop)
+    asyncio.create_task(start_loop(loop))
 
     ws_client = WsClient(
         recv_queue=ws_queue,
@@ -162,12 +163,12 @@ async def main(config):
                     jobs = await get_page_jobs_info(page)
                     cookies = {cookie['name']: cookie['value'] for cookie in  await page.context.cookies()}
                     headers = {
-                        # 'User-Agent': driver.execute_script("return navigator.userAgent;")
                         'User-Agent': await page.evaluate("() => navigator.userAgent")
                     }
                     SessionManager.update_session(cookies, headers)
                     job_queue.put(["tasks",jobs])
                     await asyncio.sleep(config.crawler.next_page_delay)
+                    job_queue.join()
                     if stop_flag.is_set():
                         logging.info("接收到停止信号，程序将在30s内退出")
                         ws_done.wait(30)

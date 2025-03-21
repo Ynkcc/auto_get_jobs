@@ -18,6 +18,7 @@ class AiAnalyzer:
         self.api_key = config_ai.api_key
         self.model = config_ai.model
         self.temperature = config_ai.temperature
+        self.job_requirements_prompt=config_ai.job_requirements_prompt
         self.provider = config_ai.provider
         self.resume_file_name = config_ai.resume_for_ai_file
         self.resume_for_ai = self._load_user_requirements()
@@ -66,8 +67,8 @@ class AiAnalyzer:
                     "messages": [
                         {"role": "system", "content": "你是一个友好的求职助手，请根据以下职位信息生成一段简洁明了的打招呼语，突出求职者的优势和对职位的兴趣。请参考以下模版: " + self.greeting_template},
                         {"role": "user", "content": f"职位信息：{job_detail}"},
-                        {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"},
-                        {"role":"user","content":"输出内容仅包含打招呼语"}
+                        {"role":"user","content":f"用户简历：{self.resume_for_ai}"},
+                        {"role":"system","content":"输出内容仅包含打招呼语，使用口语化的表达"}
                     ],
                     "temperature": self.temperature,
                 }
@@ -118,7 +119,8 @@ class AiAnalyzer:
                     "messages": [
                         {"role": "system", "content": self.ai_prompt},
                         {"role": "user", "content": f"岗位要求：{job_detail}"},
-                        {"role":"user","content":f"用户简历、要求：{self.resume_for_ai}"}
+                        {"role":"user","content":f"用户简历：{self.resume_for_ai}"},
+                        {"role":"user","content":f"用户对工作岗位的要求：{self.job_requirements_prompt}"}
                     ],
                     "temperature": self.temperature,
                     #"max_tokens": 50 DeepSeek-R1包含思考过程，max_tokens太低会使回答不完整

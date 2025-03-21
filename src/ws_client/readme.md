@@ -58,7 +58,7 @@
 ```python
         elif callable(extra_headers):
             websocket_headers = extra_headers(websocket_headers)
-            +++ websocket_headers["Sec-Websocket-Protocol"] = extra_headers.get('Sec-WebSocket-Protocol', 'mqtt')
+            + websocket_headers["Sec-Websocket-Protocol"] = extra_headers.get('Sec-WebSocket-Protocol', 'mqtt')
         header = "\\r\\n".join([
             f"GET {self._path} HTTP/1.1",
             "\\r\\n".join(f"{i}: {j}" for i, j in websocket_headers.items()),
@@ -78,10 +78,10 @@
             if self._in_packet['remaining_length'] < 2:
                 return MQTTErrorCode.MQTT_ERR_PROTOCOL
         elif self._in_packet['remaining_length'] != 2:
-                --- return MQTTErrorCode.MQTT_ERR_PROTOCOL
-            +++ self._in_packet["packet"] = self._in_packet["packet"][:2]
-            +++ self._in_packet['remaining_count'] = [2]
-            +++ self._in_packet["remaining_length"] = 2
+                - return MQTTErrorCode.MQTT_ERR_PROTOCOL
+            + self._in_packet["packet"] = self._in_packet["packet"][:2]
+            + self._in_packet['remaining_count'] = [2]
+            + self._in_packet["remaining_length"] = 2
 ```
 
 ### 4.3. 连接丢失问题 (`MQTT_ERR_CONN_LOST`)
@@ -107,8 +107,8 @@
                 return MQTTErrorCode.MQTT_ERR_CONN_LOST
             else:
                 if len(command) == 0:
-                    --- return MQTTErrorCode.MQTT_ERR_CONN_LOST
-                    +++ return MQTTErrorCode.MQTT_ERR_AGAIN
+                    - return MQTTErrorCode.MQTT_ERR_CONN_LOST
+                    + return MQTTErrorCode.MQTT_ERR_AGAIN
                 self._in_packet['command'] = command[0]
 ```
 

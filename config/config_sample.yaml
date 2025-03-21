@@ -32,8 +32,11 @@ ai:
 
   prompt: |  # AI分析提示词模板
     帮助用户判断这个岗位是否合适
-    岗位应与用户简历提供的方向一致
+    岗位应与用户提供的方向一致
     输出严格遵循以下规则：只返回"true"或"false"
+  job_requirements_prompt: | # 岗位需求提示词
+    我想要找一份it行业的工作。偏技术性的岗位
+    不考虑售后、售前、外包或教育行业。接受项目制或者兼职，实习形式的工作
   resume_for_ai_file: "data/resume_for_ai.md"  # 用户简历文件路径
 
 # =============== 申请配置 ===============
@@ -47,6 +50,9 @@ application:
       我对贵司的{job_name}岗位很感兴趣，
       我的技能包括：{skills}，
       期待与您进一步沟通！
+    # 未实现 
+    #供ai参考的用户招呼语历史，以生成风格类似的招呼语
+    greeting_for_ai: "data/greeting_for_ai.md" 
   # 未实现
   resume_name: "resume.pdf" #hr请求简历时的，发送的简历名称
 
@@ -96,7 +102,8 @@ job_search:
 # =============== 账号配置 ===============
 accounts:
   - username: "account1"
-  - username: "account2"
+  #参考以下格式，添加账号
+  #- username: "account2"
 
 # =============== 公司筛选配置 ===============
 job_check:

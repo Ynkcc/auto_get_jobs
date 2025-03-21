@@ -19,6 +19,7 @@ class AiConfig(BaseModel):
     provider: str
     resume_for_ai_file: str
     prompt: str
+    job_requirements_prompt: str
 
 class CrawlerConfig(BaseModel):
     webdriver: WebdriverConfig

@@ -47,9 +47,11 @@ class JobDetail(Base):
     
     # 系统状态字段
     visited = Column(Boolean, default=False)
-    analysisResult = Column(Boolean, default=False) #没分析/不匹配都是False #TODO
+    analysisResult = Column(Boolean)
     applied_account = Column(Text)
     updateTime = Column(DateTime, default=datetime.now)
+    # 首次获取职位时的日期
+    first_added_time = Column(DateTime)
 
 
 class DatabaseManager:
@@ -135,7 +137,8 @@ class DatabaseManager:
             'encryptJobId': encryptJobId,
             'lid': lid,
             'securityId': securityId,
-            'updateTime':datetime.now()
+            'updateTime':datetime.now(),
+            'first_added_time': datetime.now()
         }
 
     def _build_detail_data(self, card: Dict, detail: Dict) -> Dict:
@@ -169,6 +172,9 @@ class DatabaseManager:
             if existing:
                 # 更新现有记录
                 for key, value in record.items():
+                    # 忽略first_added_time
+                    if key == "first_added_time":
+                        continue
                     setattr(existing, key, value)
             else:
                 # 插入新记录
