@@ -1,65 +1,51 @@
-# BOSS直聘自动化项目架构说明
+# 开发者文档
 
-##### 本段文字由 [deepseek-r1]() 生成
+## 数据流图
 
-## 项目概述
-基于Python实现的BOSS直聘自动化工具，主要功能包括：职位信息采集、智能匹配分析、自动投递简历、数据持久化存储。采用多进程+异步IO架构实现高效处理。
+```mermaid
+graph LR
+    A[main.py] --> B(config/config.yaml);
+    B --> C{日志配置};
+    A --> D[JobHandler];
+    A --> E[WsClient];
+    A --> F[DatabaseManager];
+    A --> G{用户登录};
+    G --> H{构建搜索URL};
+    H --> I{循环搜索};
+    I --> J[职位信息];
+    J --> K(job_queue);
+    K --> L[JobHandler];
+    L --> M{薪资过滤};
+    M --> N{数据库过滤};
+    N --> O{AI分析};
+    O -- 匹配 --> P{发送打招呼语};
+    P --> Q(WsClient);
+    O -- 不匹配 --> R{保存职位信息};
+    L --> R;
+    Q --> S(WebSocket服务器);
+    A --> T{程序退出};
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#ccf,stroke:#333,stroke-width:2px
+    style D fill:#ccf,stroke:#333,stroke-width:2px
+    style E fill:#ccf,stroke:#333,stroke-width:2px
+    style F fill:#ccf,stroke:#333,stroke-width:2px
+```
 
----
+## 流程说明
 
-## 系统架构
-
-### 1. 核心模块
-```python
-├── main.py                 # 主程序入口
-├── job_processor.py        # 核心处理逻辑（多进程+异步IO）
-├── utils_database.py       # 数据库管理模块
-├── utils.py                # 基础工具库
-├── utils_async.py          # 异步处理工具
-└── user_requirements.md    # 用户简历
-```
-### 2. 模块职责说明
-
-2.1 数据存储层 (utils_database.py)
-```
-class JobDetail(Base):           # 职位信息数据模型
-class DatabaseManager:           # 数据库操作核心类
-    ├── save_jobs_details()      # 数据存储主逻辑
-    ├── filterVisited()          # 已访问职位过滤
-    └── _upsert_records()        # 智能合并数据（新增/更新）
-```
-2.2 业务处理层 (job_processor.py)
-```
-class JobProcessor:              # 多进程任务处理器
-    ├── _process_single_job()    # 单个职位处理流程
-    ├── _process_batch()         # 批量任务调度
-    └── start_processing()       # 启动异步处理循环
-```
-2.3 基础工具层
-
-```
-# utils.py
-├── init_driver()               # 浏览器驱动初始化
-├── filterJobsBySalary()        # 薪资过滤器
-└── parseParams()               # URL参数解析器
-
-# utils_async.py
-├── aiHrCheck()                # AI匹配度分析
-├── getJobInfo()               # 异步获取职位详情
-└── startChat()                # 发起沟通接口
-```
----
-
-```
-graph TD
-    A[主程序启动] --> B[浏览器初始化]
-    B --> C[自动登录/加载cookies]
-    C --> D[构造搜索URL]
-    D --> E[获取职位列表]
-    E --> F[薪资过滤+去重过滤]
-    F --> G[子进程任务分发]
-    G --> H{AI智能匹配}
-    H -->|匹配成功| I[自动投递简历]
-    H -->|匹配失败| J[标记为已访问]
-    I --> K[结果持久化存储]
-```
+1.  **程序启动**: `main.py` 作为程序入口，加载 `config/config.yaml` 配置文件。
+2.  **日志配置**: 根据配置文件配置日志系统。
+3.  **初始化**: 初始化 `JobHandler`, `WsClient`, `DatabaseManager` 等组件。
+4.  **用户登录**: 使用 Playwright 模拟用户登录 BOSS 直聘网站。
+5.  **构建搜索 URL**: 根据配置文件中的 `job_search` 参数，构建搜索 URL 列表。
+6.  **循环搜索**: 循环遍历搜索 URL 列表，访问每个 URL，获取职位信息。
+7.  **职位信息处理**:
+    *   将获取到的职位信息放入 `job_queue` 队列。
+    *   `JobHandler` 从 `job_queue` 队列中取出职位信息。
+    *   根据配置的 `salary_range` 过滤职位。
+    *   从数据库中过滤掉已经访问过的职位。
+    *   使用 AI 分析职位是否匹配。
+    *   如果匹配，则发送打招呼语（如果启用 AI 打招呼语）。
+    *   将职位信息保存到数据库。
+8.  **WebSocket 通信**: `WsClient` 负责与 WebSocket 服务器通信，发送打招呼语等消息。
+9.  **程序退出**: 接收到停止信号后，程序退出。

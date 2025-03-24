@@ -52,6 +52,7 @@ class JobDetail(Base):
     updateTime = Column(DateTime, default=datetime.now)
     # 首次获取职位时的日期
     first_added_time = Column(DateTime)
+    analysis_think = Column(Text)
 
 
 class DatabaseManager:
@@ -157,7 +158,8 @@ class DatabaseManager:
             'analysisResult':detail.get("analysis_result"),
             'applied_account': self.userId,#用户id
             'visited': True,
-            "activeTimeDesc":card.get("activeTimeDesc")
+            "activeTimeDesc":card.get("activeTimeDesc"),
+            'analysis_think': detail.get("analysis_think","")
         }
 
     def _upsert_records(self, session, records: List[Dict]) -> None:
