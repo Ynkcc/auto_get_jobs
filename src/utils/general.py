@@ -334,15 +334,16 @@ async def next_page(page: Page):
         return False
 
 
-def filter_jobs_by_salary(jobs: List[Dict], expected_salary: float) -> List[Dict]:
+def filter_jobs_by_salary(jobs: List[Dict], min_expected_salary: float, max_expected_salary: float) -> List[Dict]:
     """
-    根据期望薪资过滤岗位
+    根据期望薪资范围过滤岗位
     :param jobs: 岗位列表
-    :param expected_salary: 期望薪资（单位：K）
+    :param min_expected_salary: 期望最低薪资（单位：K）
+    :param max_expected_salary: 期望最高薪资（单位：K）
     :return: 符合条件的岗位列表
     """
     jobs_matching_salary = []
-    
+
     for job in jobs:
         job_name = job['job_name']
         job_salary = job['job_salary']
@@ -350,10 +351,10 @@ def filter_jobs_by_salary(jobs: List[Dict], expected_salary: float) -> List[Dict
         try:
             # 预处理：去除类似"·13薪"的后缀
             job_salary = re.sub(r'·\d+薪', '', job_salary)
-            
+
             # 统一转换为小写方便处理
             salary_str = job_salary.lower()
-            
+
             if '元/天' in salary_str:
                 # 日薪处理（按22工作日/月）
                 daily = salary_str.replace('元/天', '')
@@ -402,11 +403,11 @@ def filter_jobs_by_salary(jobs: List[Dict], expected_salary: float) -> List[Dict
             continue
 
         # 薪资判断逻辑
-        if min_monthly >= expected_salary:
+        if min_expected_salary <= min_monthly and max_monthly <= max_expected_salary:
             jobs_matching_salary.append(job)
             logger.debug(f"符合条件 | 岗位: {job_name} | 范围: {min_monthly:.1f}-{max_monthly:.1f}K")
         else:
-            logger.info(f"薪资不足 | 岗位: {job_name} | 当前范围: {min_monthly:.1f}-{max_monthly:.1f}K")
+            logger.info(f"薪资不符合 | 岗位: {job_name} | 当前范围: {min_monthly:.1f}-{max_monthly:.1f}K | 期望范围: {min_expected_salary:.1f}-{max_expected_salary:.1f}K")
 
     return jobs_matching_salary
 

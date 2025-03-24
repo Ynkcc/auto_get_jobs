@@ -107,7 +107,7 @@ accounts:
 
 # =============== 公司筛选配置 ===============
 job_check:
-  salary_range: [3, 20]  # 期望薪资范围（K）,目前只处理最低薪资
+  salary_range: [1.1, 3.3]  # 期望薪资范围（K）
   inactive_status:       # HR活跃状态排除项
     - 本月活跃
     - 2月内活跃
@@ -119,9 +119,10 @@ job_check:
   check_insurance: true  # 是否检查社保人数（未实现）
   min_insured: 10        # 最小参保人数（未实现）
   exclude_outsource: true # 排除外包公司（未实现）
+  check_visited: true # 是否检查已访问过的岗位
 
 # =============== 通知配置 ===============
-#未实现
+# 未实现
 notification:
   email:
     enabled: false

@@ -25,7 +25,8 @@ class JobHandler(threading.Thread):
         self.db_manager = DatabaseManager(config.database.filename)
         self.inactive_keywords = config.job_check.inactive_status
         self.resume_image_enabled = config.application.send_resume_image
-        self.min_salary,self.max_salary = config.job_check.salary_range
+        self.min_salary, self.max_salary = config.job_check.salary_range
+        self.check_visited = config.job_check.check_visited
         self.cookies= {}
         self.headers = {}
 
@@ -134,15 +135,19 @@ class JobHandler(threading.Thread):
                 self.done_event.clear()
                 _, jobs_batch = batch
                 # 满足薪资要求的岗位
-                filter_salary_jobs = filter_jobs_by_salary(jobs_batch, self.min_salary)
-                # 未被访问过的岗位
-                unvisited_jobs = self.db_manager.filter_visited(filter_salary_jobs)
+                filter_salary_jobs = filter_jobs_by_salary(jobs_batch, self.min_salary, self.max_salary)
+                
+                filtered_jobs = filter_salary_jobs
+                if self.check_visited:
+                    # 未被访问过的岗位
+                    filtered_jobs = self.db_manager.filter_visited(filter_salary_jobs)
+                
                 results = []
-                if unvisited_jobs:
+                if filtered_jobs:
                     try:
                         results = self.loop.run_until_complete(
                             asyncio.wait_for(
-                                self._process_batch(unvisited_jobs),
+                                self._process_batch(filtered_jobs),
                                 timeout=900  # 单位：秒
                             )
                         )
@@ -151,6 +156,6 @@ class JobHandler(threading.Thread):
                     except asyncio.TimeoutError:
                         logger.info("Batch processing timed out after 600 seconds")
                         results = []
-                self.db_manager.save_jobs_details(jobs_batch,results)
+                self.db_manager.save_jobs_details(jobs_batch, results)
                 self.done_event.set()
                 self.job_queue.task_done()

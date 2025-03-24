@@ -73,11 +73,12 @@ class AccountConfig(BaseModel):
     username: str
 
 class JobCheckConfig(BaseModel):
-    salary_range: List[int]
+    salary_range: List[float]
     inactive_status: List[str]
     check_insurance: bool
     min_insured: int
     exclude_outsource: bool
+    check_visited: bool
 
 class EmailConfig(BaseModel):
     enabled: bool
