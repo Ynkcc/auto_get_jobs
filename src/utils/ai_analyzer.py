@@ -5,8 +5,8 @@ import re
 
 import aiohttp
 
-from utils.config_manager import ConfigManager
-from utils.session_manager import SessionManager
+from .config_manager import ConfigManager
+from .session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class AiAnalyzer:
         config = ConfigManager.get_config()
         greeting_config = config.application.greeting
         self.greeting_enable_ai = greeting_config.enable_ai
-        self.greeting_template = greeting_config.template
+        self.greeting_prompt = greeting_config.greeting_prompt
 
     def _load_user_requirements(self):
         """从文件加载用户简历"""
@@ -65,11 +65,20 @@ class AiAnalyzer:
                 payload = {
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": "你是一个友好的求职助手，请根据以下职位信息生成一段简洁明了的打招呼语，突出求职者的优势和对职位的兴趣。请参考以下模版: " + self.greeting_template},
-                        {"role": "user", "content": f"职位信息：{job_detail}"},
-                        {"role":"user","content":f"用户简历：{self.resume_for_ai}"},
-                        {"role":"system","content":"输出内容仅包含打招呼语，使用口语化的表达"}
+                        {
+                            "role": "system",
+                            "content": self.greeting_prompt
+                        },
+                        {
+                            "role": "user",
+                            "content": f"目标职位关键要求：{job_detail}\n\n求职者真实简历：{self.resume_for_ai}"
+                        },
+                        {
+                            "role": "system",
+                            "content": "请生成符合上述要求的打招呼语，仅输出最终内容，不要用任何标记符号"
+                        }
                     ],
+
                     "temperature": self.temperature,
                 }
 

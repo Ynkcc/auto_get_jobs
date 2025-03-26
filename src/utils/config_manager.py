@@ -30,7 +30,7 @@ class CrawlerConfig(BaseModel):
 
 class GreetingConfig(BaseModel):
     enable_ai: bool
-    template: str
+    greeting_prompt: str
 
 class ApplicationConfig(BaseModel):
     send_resume_image: bool

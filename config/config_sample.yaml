@@ -30,7 +30,7 @@ ai:
   # # api_url: "https://zhenze-huhehaote.cmecloud.cn/inference-api/exp-api/inf-1336781912337387520/v1/chat/completions"  #完整url链接
   # api_url: "https://zhenze-huhehaote.cmecloud.cn/inference-api/exp-api/inf-1336844822260682752/v1/chat/completions"
 
-  prompt: |  # AI分析提示词模板
+  prompt: |  # AI分析提示词
     帮助用户判断这个岗位是否合适
     岗位应与用户提供的方向一致
     输出严格遵循以下规则：只返回"true"或"false"
@@ -45,11 +45,16 @@ application:
   resume_image_file: "data/resume.jpg"
   greeting: 
     enable_ai: false  # 是否使用AI生成招呼语
-    template: |
-      尊敬的HR您好，
-      我对贵司的{job_name}岗位很感兴趣，
-      我的技能包括：{skills}，
-      期待与您进一步沟通！
+    greeting_prompt: | # 打招呼语提示词
+      你是一个专业的求职辅助AI，请严格遵循以下规则生成打招呼语：
+      1. 基于用户简历的【真实经历】和【实际技能】，禁止任何虚构或夸张
+      2. 保持谦逊得体的商务口语表达，避免过度自我吹嘘
+      3. 重点突出与职位需求的【精准匹配点】
+      4. 使用"意向表达+匹配说明+礼貌收尾"三段式结构
+      5. 总字数控制在120字以内
+      6. 禁止使用感叹号等夸张符号
+      7. 示例参考：
+      "您好，看到贵司的[岗位名称]招聘信息，我的[相关经验/技能]与该岗位要求较为契合。[简明列举1-2个真实匹配点]。如合适希望能进一步沟通。"
     # 未实现 
     #供ai参考的用户招呼语历史，以生成风格类似的招呼语
     greeting_for_ai: "data/greeting_for_ai.md" 

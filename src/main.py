@@ -90,7 +90,14 @@ async def login(page, account,loop):
     print(f"等待登陆...")
     #加载cookies
     if await manager.load():
-        await page.reload()  # Use reload instead of refresh
+        for i in range(3):  # Retry up to 3 times
+            try:
+                await page.reload()
+                break  # If successful, break the loop
+            except Exception as e:
+                print(f"页面加载失败: {e}, 尝试重新加载页面 ({i+1}/3)")
+        else:
+            print("页面加载多次失败，程序可能无法正常登录")
     try:
         # Instead of WebDriverWait, use Playwright's wait_for_selector
         await page.locator('a[ka="header-username"]').wait_for(timeout=600000) # timeout in milliseconds
@@ -123,13 +130,10 @@ async def main(config):
         running_event=running_event,
     )
 
-    # 创建事件循环
-    loop = asyncio.get_event_loop()
     # 创建一个子线程
     # executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     # loop.run_in_executor(executor, start_loop, loop)
-    asyncio.create_task(start_loop(loop))
-
+    loop = asyncio.get_running_loop()
     ws_client = WsClient(
         recv_queue=ws_queue,
         publish_done=ws_done,

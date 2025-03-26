@@ -78,6 +78,7 @@ class JobHandler(threading.Thread):
                 if self.ai_analyzer.greeting_enable_ai:
                     # 调用 ai_greeting 方法获取打招呼语
                     greeting_message = await self.ai_analyzer.ai_greeting(job_requirements)
+                    logger.info(f"job {job_data['job_name']}: 打招呼语： {greeting_message}")
 
                 # 限速调用
                 await self.rate_limit.get_token()  # 限速调用
