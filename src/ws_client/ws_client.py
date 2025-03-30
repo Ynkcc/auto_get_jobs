@@ -22,11 +22,11 @@ from utils.config_manager import ConfigManager
 class WsClient(threading.Thread):
     sent_count = 0
     success_count = 0
-    hostname = "ws6.zhipin.com"
+    hostname = "ws.zhipin.com"
     port = 443
     path = '/chatws'
     topic = 'chat'
-    reconnect_interval = 10  # 重连间隔秒数
+    reconnect_interval = 8  # 重连间隔秒数
     uid = None
     token = None
     wt2 = None
@@ -106,7 +106,7 @@ class WsClient(threading.Thread):
 
         # 建立连接
         try:
-            self.client.connect(self.hostname, self.port, keepalive=25)
+            self.client.connect(self.hostname, self.port, keepalive=5)
             self.client.loop_start()
         except Exception as e:
             self.logger.error(f"连接失败: {e}")
@@ -195,11 +195,7 @@ class WsClient(threading.Thread):
         while self._running.is_set():
             recv_msg = self.recv_queue.get()
             self.recv_queue.task_done()
-            if recv_msg[0] == "update_cookies":
-                _, self.cookies, self.headers = recv_msg
-                if self.client is None:
-                    self._init_client()
-            elif recv_msg[0] == "task":
+            if recv_msg[0] == "task":
                 if self.client is None:
                     self.recv_queue.put(recv_msg)
                     self._update_cookies()

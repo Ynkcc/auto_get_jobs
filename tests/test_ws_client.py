@@ -2,6 +2,9 @@
 original code from https://github.com/xmiaoq/bossbot
 EditBy : Ynkcc
 '''
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import logging
 import threading
 import time
@@ -12,7 +15,7 @@ import socks
 import requests
 import paho.mqtt.client as mqtt
 import paho.mqtt
-from techwolf_pb2 import TechwolfChatProtocol
+from src.ws_client.techwolf_pb2 import TechwolfChatProtocol
 from google.protobuf import json_format
 import secrets
 class WSclient(threading.Thread):

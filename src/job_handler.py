@@ -130,9 +130,7 @@ class JobHandler(threading.Thread):
 
         while self.running_event.is_set():
             batch = self.job_queue.get()
-            if batch[0]=="update_cookies":
-                _, self.cookies, self.headers = batch
-            elif batch[0]=="tasks":
+            if batch[0]=="tasks":
                 self.done_event.clear()
                 _, jobs_batch = batch
                 # 满足薪资要求的岗位
