@@ -4,7 +4,6 @@ EditBy : Ynkcc
 '''
 import logging
 logger = logging.getLogger(__name__)
-import socks
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
@@ -78,6 +77,7 @@ class WsClient(threading.Thread):
             transport='websockets',
             clean_session=True
         )
+        #import socks
         #self.client.proxy_set(proxy_type=socks.HTTP, proxy_addr="127.0.0.1", proxy_port=8888)
         self._setup_callbacks()
         try:
