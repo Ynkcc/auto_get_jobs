@@ -39,16 +39,11 @@ def setup_logging(logging_config):
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
 
-    # 获取 selenium remote connection 的 logger 并设置 level 为 WARNING
-    selenium_logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
-    selenium_logger.setLevel(logging.WARNING)
     urllib3_logger = logging.getLogger('urllib3.connectionpool')
     urllib3_logger.setLevel(logging.WARNING)
 setup_logging(logging_config)
 logger = logging.getLogger(__name__)
 
-# from selenium.common.exceptions import TimeoutException # no need
-# from selenium.webdriver.support import expected_conditions as EC # no need
 import sys
 from queue import Queue
 import threading
@@ -99,7 +94,6 @@ async def login(page, account,loop):
         else:
             print("页面加载多次失败，程序可能无法正常登录")
     try:
-        # Instead of WebDriverWait, use Playwright's wait_for_selector
         await page.locator('a[ka="header-username"]').wait_for(timeout=600000) # timeout in milliseconds
     except TimeoutError:
         print("登录超时，程序自动退出")
@@ -111,7 +105,7 @@ async def login(page, account,loop):
     return manager
 
 async def main(config):
-    page = await init_driver(config.crawler.webdriver)
+    page = await init_driver(config.crawler.playwright)
 
     # 创建共享队列和事件
     job_queue = Queue()

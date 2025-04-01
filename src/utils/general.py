@@ -137,20 +137,20 @@ class BrowserSessionHandler:
             return False
 
 
-async def init_driver(webdriver_config):
+async def init_driver(playwright_config):
     """
     初始化 Playwright 浏览器
-    :param webdriver_config: WebDriver配置对象
+    :param playwright_config: playwright配置对象
     :return: Playwright 浏览器实例
     """
-    browser_type = webdriver_config.browser_type.lower()
+    browser_type = playwright_config.browser_type.lower()
 
     try:
         playwright = await async_playwright().start()
 
-        if browser_type == "edge" or browser_type == "chromium":
+        if browser_type == "chromium":
             browser = await playwright.chromium.launch(
-                headless=webdriver_config.headless,
+                headless=playwright_config.headless,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     '--log-level=3',  # 只记录严重错误
@@ -159,7 +159,7 @@ async def init_driver(webdriver_config):
             )
         elif browser_type == "firefox":
             browser = await playwright.firefox.launch(
-                headless=webdriver_config.headless,
+                headless=playwright_config.headless,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     '--log-level=3',  # 只记录严重错误
@@ -168,7 +168,27 @@ async def init_driver(webdriver_config):
             )
         elif browser_type == "webkit":
             browser = await playwright.webkit.launch(
-                headless=webdriver_config.headless,
+                headless=playwright_config.headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',  # 只记录严重错误
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+        elif browser_type == "edge":
+            browser = await playwright.chromium.launch(
+                channel="msedge",
+                headless=playwright_config.headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',  # 只记录严重错误
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+        elif browser_type == "chrome":
+            browser = await playwright.chromium.launch(
+                channel="chrome",
+                headless=playwright_config.headless,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     '--log-level=3',  # 只记录严重错误

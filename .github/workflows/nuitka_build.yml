@@ -1,42 +1,113 @@
+name: Nuitka Build and Release
+
+on:
+  push:
+    # branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
 jobs:
-build:
-   strategy:
+  build:
+    strategy:
       matrix:
-      os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
+        include_browser: [true, false]
+        # exclude:
+        #   # 当 include_browser=false 时，排除 playwright 的安装
+        #   - include_browser: false
+        #     os: windows-latest  # 可根据需要排除特定系统
+    runs-on: ${{ matrix.os }}
 
-   runs-on: ${{ matrix.os }}
-
-   steps:
-      - name: Check-out repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-         python-version: '3.12'
-         cache: 'pip'
-         cache-dependency-path: |
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
             **/requirements*.txt
 
-      - name: Install your Dependencies
-      run: |
-         pip install -r requirements.txt
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          pip install -r requirements.txt
+          if ${{ matrix.include_browser }}; then 
+          playwright install chromium
+          fi
+
+      - name: Patch paho-mqtt
+        run: python src/ws_client/patch.py
 
       - name: Build Executable with Nuitka
-      uses: Nuitka/Nuitka-Action@main
-      with:
-         nuitka-version: main
-         script-name: main.py
-         # many more Nuitka options available, see action doc, but it's best
-         # to use nuitka-project: options in your code, so e.g. you can make
-         # a difference for macOS and create an app bundle there.
-         mode: onefile
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          nuitka-version: main
+          script-name: src/main.py
+          mode: onefile
+          mingw64: true
+          module-parameter: |
+            ${{ matrix.include_browser && '--playwright-include-browser=chromium-1161' || '--playwright-include-browser=none' }}
 
-      - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-         name: ${{ runner.os }} Build
-         path: | # match what's created for the 3 OSes
-            build/*.exe
-            build/*.bin
-         include-hidden-files: true
+      - name: Prepare Resources
+        shell: bash
+        run: |
+          cp data/resume_sample.png data/resume.png
+          cp data/resume_for_ai_sample.md data/resume_for_ai.md 
+          cp config/config_sample.yaml config/config.yaml
+
+      - name: Package Artifacts
+        shell: bash
+        run: |
+          os_short=${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || 'windows' }}
+          filename="${os_short}$([ "${{ matrix.include_browser }}" = 'true' ] || echo '-without_chromium').zip"
+            
+          mkdir -p output
+            
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            zip -9 -r "output/$filename" build/*.bin config data
+          else
+            pwsh -Command "Compress-Archive -Path build/*.bin,config,data -DestinationPath output/$filename -CompressionLevel Optimal"
+          fi
+          echo "filename=${filename}" >> $GITHUB_OUTPUT
+        id: package
+  
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+            name: ${{ steps.package.outputs.filename }}
+            path: output/${{ steps.package.outputs.filename }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Files
+        shell: bash
+        run: |
+          mkdir -p release_files
+          find artifacts -name '*.zip' -exec cp {} release_files/ \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Automated build for version ${{ github.ref_name }}
+            - Includes Windows and Linux builds
+            - Variants with/without Chromium browser
+          files: release_files/*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

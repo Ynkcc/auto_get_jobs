@@ -4,10 +4,9 @@ from typing import Dict, Any, List, Optional
 import yaml
 import os
 
-class WebdriverConfig(BaseModel):
+class playwrightConfig(BaseModel):
     browser_type: str
-    chrome_driver_path: str
-    edge_driver_path: str
+    custom_browser_path: str
     headless: bool
     use_default_data_dir: bool
 
@@ -22,7 +21,7 @@ class AiConfig(BaseModel):
     job_requirements_prompt: str
 
 class CrawlerConfig(BaseModel):
-    webdriver: WebdriverConfig
+    playwright: playwrightConfig
     rate_limit: Dict[str, float]
     next_page_delay: int
     request_timeout: int
@@ -131,8 +130,9 @@ class ConfigManager:
                 loc = "->".join(str(loc) for loc in error['loc'])
                 msg = f"{loc}: {error['msg']}"
                 error_messages.append(msg)
+            error_messages_str='\n'.join(error_messages)
             raise ValueError(
-                f"配置验证错误:\n{'\n'.join(error_messages)}"
+                f"配置验证错误:\n{error_messages_str}"
             ) from e
 
     @classmethod
