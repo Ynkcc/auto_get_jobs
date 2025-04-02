@@ -27,6 +27,7 @@ class JobHandler(threading.Thread):
         self.resume_image_enabled = config.application.send_resume_image
         self.min_salary, self.max_salary = config.job_check.salary_range
         self.check_visited = config.job_check.check_visited
+        self.test_mode = config.job_check.test_mode
         self.cookies= {}
         self.headers = {}
 
@@ -50,8 +51,10 @@ class JobHandler(threading.Thread):
             result['job_data'] = job_detail
             # 检查HR活跃状态
             active_status = job_detail['zpData']['jobCard'].get('activeTimeDesc', '')
-            if active_status in self.inactive_keywords:
-                logger.info(f"跳过{job_data['job_name']}：HR活跃状态[{active_status}]不符合要求")
+            if (active_status in self.inactive_keywords and not self.test_mode) or \
+               (self.test_mode and active_status not in self.inactive_keywords):
+                reason = f"测试模式过滤活跃HR[{active_status}]" if self.test_mode else f"HR活跃状态[{active_status}]不符合要求"
+                logger.info(f"跳过{job_data['job_name']}：{reason}")
                 return result
 
             # 构建岗位要求
@@ -128,6 +131,11 @@ class JobHandler(threading.Thread):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
+        # 测试模式 
+        if self.test_mode:
+            self.check_visited = False
+            self.min_salary,self.max_salary = 0,100
+        
         while self.running_event.is_set():
             batch = self.job_queue.get()
             if batch[0]=="tasks":

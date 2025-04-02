@@ -1,0 +1,81 @@
+name: Debug Release Builder with tmate
+
+on:
+  workflow_dispatch:  # 必须手动触发以便调试
+    inputs:
+      enable_tmate:
+        description: 'Enable tmate debug session'
+        required: false
+        default: 'false'
+        type: boolean
+      source_run_id:
+        description: 'Source workflow run ID'
+        required: true
+        type: string
+
+jobs:
+  package-release:
+    runs-on: ubuntu-latest
+    steps:
+      # 步骤1：获取指定运行ID的构建产物
+      # 存在问题
+      - name: Download Artifacts from Other Workflow
+        uses: actions/download-artifact@v4
+        with:
+          repository: ${{ github.repository }}  # 格式：owner/repo
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GH_PAT }}  # 需要具有actions:read权限的PAT
+        #  path: artifacts
+        #  name: nuitka_build
+
+      # 步骤2：启动第一次调试会话（查看原始文件）
+      - name: Debug Artifacts (Pre-Package)
+        if: ${{ inputs.enable_tmate }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
+        with:
+          limit-access-to-organization: true
+          prompt: "🕵️ 检查原始构建产物 | 输入 'exit' 继续工作流"
+          session-name: pre-package-debug
+
+      # 步骤3：压缩打包处理
+      - name: Package Artifacts
+        run: |
+          mkdir -p packaged
+          find artifacts -maxdepth 1 -mindepth 1 -type d | while read dir; do
+            base=$(basename "$dir")
+            echo "Compressing: $base"
+            zip -r "packaged/${base}.zip" "$dir"
+          done
+
+      # 步骤4：启动第二次调试会话（验证压缩包）
+      - name: Debug Packages (Pre-Release)
+        if: ${{ inputs.enable_tmate }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
+        with:
+          limit-access-to-organization: true
+          prompt: "🔍 验证压缩包内容 | 输入 'exit' 继续发布"
+          session-name: pre-release-debug
+          run: |
+            echo "=== 压缩包列表 ==="
+            ls -lh packaged
+            echo "\n=== 示例文件校验 ==="
+            unzip -l packaged/*.zip | head -n 10
+
+      # 步骤5：创建调试版Release
+      - name: Create Debug Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: debug-${{ github.run_id }}
+          name: "Debug Builds (${{ github.run_id }})"
+          body: |
+            交互式调试构建版本
+            - 调试会话次数：${{ steps.tmate.outputs.session_count }}
+            - 最终文件校验：
+              ```sh
+              $(sha256sum packaged/*.zip)
+              ```
+          files: packaged/*.zip
+          draft: true
+          prerelease: true
