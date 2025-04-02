@@ -72,6 +72,7 @@ class AccountConfig(BaseModel):
     username: str
 
 class JobCheckConfig(BaseModel):
+    test_mode: bool
     salary_range: List[float]
     inactive_status: List[str]
     check_insurance: bool

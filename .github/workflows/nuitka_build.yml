@@ -53,33 +53,28 @@ jobs:
       - name: Prepare Resources
         shell: bash
         run: |
+          set -x
+          os_short=${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || 'windows' }}
+          dir_name="${os_short}${{ matrix.include_browser && '-chromium' || '' }}"
+          mkdir -p "output/$dir_name"
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            mv build/main.bin "output/$dir_name/main"
+          else
+            mv build/main.exe "output/$dir_name/"
+          fi
           mv data/resume_sample.png data/resume.png
           mv data/resume_for_ai_sample.md data/resume_for_ai.md 
           mv config/config_sample.yaml config/config.yaml
-
-      - name: Package Artifacts
-        shell: bash
-        run: |
-          os_short=${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || 'windows' }}
-          filename="${os_short}$([ "${{ matrix.include_browser }}" = 'true' ] && echo '-chromium').zip"
-            
-          mkdir -p output
-            
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            mv build/main.bin main.bin
-            zip -9 -r "output/$filename" main.bin config data
-          else
-            mv build/main.exe main.exe
-            pwsh -Command "Compress-Archive -Path main.exe,config,data -DestinationPath output/$filename -CompressionLevel Optimal"
-          fi
-          echo "filename=${filename}" >> $GITHUB_OUTPUT
+          cp -r config data "output/$dir_name/"
+          
+          echo "dir_name=${dir_name}" >> $GITHUB_OUTPUT
         id: package
-  
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-            name: ${{ steps.package.outputs.filename }}
-            path: output/${{ steps.package.outputs.filename }}
+          name: ${{ steps.package.outputs.dir_name }}
+          path: output/${{ steps.package.outputs.dir_name }}
 
   release:
     needs: build
@@ -92,12 +87,6 @@ jobs:
         with:
           path: artifacts
 
-      - name: Prepare Release Files
-        shell: bash
-        run: |
-          mkdir -p release_files
-          find artifacts -name '*.zip' -exec cp {} release_files/ \;
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -107,7 +96,7 @@ jobs:
             Automated build for version ${{ github.ref_name }}
             - Includes Windows and Linux builds
             - Variants with/without Chromium browser
-          files: release_files/*.zip
+          files: artifacts/*
           draft: false
           prerelease: false
         env:

@@ -108,8 +108,9 @@ accounts:
   #参考以下格式，添加账号
   #- username: "account2"
 
-# =============== 公司筛选配置 ===============
+# =============== 岗位筛选配置 ===============
 job_check:
+  test_mode: true  #记得改成false，测试模式，只投递不活跃的hr
   salary_range: [1.1, 11]  # 期望薪资范围（K）
   inactive_status:       # HR活跃状态排除项
     - 本月活跃
