@@ -5,5 +5,5 @@ data/*
 src/ws_client/protoc.exe
 *.log
 src/paho/
-main.build/
-main.dist
+*build/*
+*dist/*

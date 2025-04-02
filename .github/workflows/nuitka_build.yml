@@ -42,34 +42,35 @@ jobs:
         run: python src/ws_client/patch.py
 
       - name: Build Executable with Nuitka
-        uses: Nuitka/Nuitka-Action@main
+        uses: Ynkcc/Nuitka-Action@main
         with:
           nuitka-version: main
           script-name: src/main.py
           mode: onefile
           mingw64: true
-          module-parameter: |
-            ${{ matrix.include_browser && '--playwright-include-browser=chromium-1161' || '--playwright-include-browser=none' }}
+          playwright-include-browser: ${{ matrix.include_browser && 'chromium-1161' || 'none' }}
 
       - name: Prepare Resources
         shell: bash
         run: |
-          cp data/resume_sample.png data/resume.png
-          cp data/resume_for_ai_sample.md data/resume_for_ai.md 
-          cp config/config_sample.yaml config/config.yaml
+          mv data/resume_sample.png data/resume.png
+          mv data/resume_for_ai_sample.md data/resume_for_ai.md 
+          mv config/config_sample.yaml config/config.yaml
 
       - name: Package Artifacts
         shell: bash
         run: |
           os_short=${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || 'windows' }}
-          filename="${os_short}$([ "${{ matrix.include_browser }}" = 'true' ] || echo '-without_chromium').zip"
+          filename="${os_short}$([ "${{ matrix.include_browser }}" = 'true' ] && echo '-chromium').zip"
             
           mkdir -p output
             
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            zip -9 -r "output/$filename" build/*.bin config data
+            mv build/main.bin main.bin
+            zip -9 -r "output/$filename" main.bin config data
           else
-            pwsh -Command "Compress-Archive -Path build/*.bin,config,data -DestinationPath output/$filename -CompressionLevel Optimal"
+            mv build/main.exe main.exe
+            pwsh -Command "Compress-Archive -Path main.exe,config,data -DestinationPath output/$filename -CompressionLevel Optimal"
           fi
           echo "filename=${filename}" >> $GITHUB_OUTPUT
         id: package
