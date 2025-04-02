@@ -87,6 +87,18 @@ jobs:
         with:
           path: artifacts
 
+      - name: Prepare Release Files
+        run: |
+          find artifacts -mindepth 1 -maxdepth 1 -type d -exec zip -r {}.zip {} \;
+
+      - name: Debug Artifacts
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
+        with:
+          limit-access-to-organization: true
+          prompt: "🕵️ 检查原始构建产物 | 输入 'exit' 继续工作流"
+          session-name: pre-package-debug
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

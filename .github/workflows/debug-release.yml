@@ -24,8 +24,8 @@ jobs:
           repository: ${{ github.repository }}  # 格式：owner/repo
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GH_PAT }}  # 需要具有actions:read权限的PAT
-          path: artifacts
-         # name: nuitka_build
+        #  path: artifacts
+        #  name: nuitka_build
 
       # 步骤2：启动第一次调试会话（查看原始文件）
       - name: Debug Artifacts (Pre-Package)
