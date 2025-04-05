@@ -19,10 +19,14 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 import mimetypes
 import yaml
 from playwright.async_api import async_playwright, Page
-from utils.session_manager import SessionManager
-import asyncio
+import datetime
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
+import sqlite3
 
 # 本地模块导入
+from utils.session_manager import SessionManager
 logger = logging.getLogger(__name__)
 
 # 定义基础URL
@@ -41,6 +45,43 @@ def save_jobs_to_csv(jobs: List[Dict], filename: str = 'jobs.csv') -> None:
         logger.info(f"数据已成功导出到 {filename}")
     except Exception as e:
         logger.error(f"导出 CSV 文件时发生错误：{e}")
+
+def export_to_xlsx(db_path, export_dir):
+    """
+    将 SQLite 数据库中的 job_details 表导出为 XLSX 文件，并应用筛选和格式化。
+
+    Args:
+        db_path (str): SQLite 数据库文件路径。
+        export_dir (str): 要保存 XLSX 文件的目录路径。
+    """
+    timestamp = datetime.datetime.now().strftime("%H%M")
+    filename = f"jobs_{timestamp}.xlsx"
+    xlsx_path = os.path.join(export_dir, filename)
+
+    conn = sqlite3.connect(db_path)
+    df = pd.read_sql_query("SELECT * FROM job_details ORDER BY first_added_time DESC", conn)
+    df.to_excel(xlsx_path, index=False, engine='openpyxl')
+    conn.close()
+
+    workbook = load_workbook(xlsx_path)
+    worksheet = workbook.active
+    cols_to_format = ['postDescription', 'analysis_think']
+    target_width = 40
+    for col_idx, column_cell in enumerate(worksheet[1], 1):
+        column_letter = get_column_letter(col_idx)
+        if column_cell.value in cols_to_format:
+            worksheet.column_dimensions[column_letter].width = target_width
+            logger.info(f"设置列 '{column_cell.value}' ({column_letter}) 宽度为 {target_width}")
+    # 创建居中对齐样式,以及自动化换行
+    center_alignment = Alignment(horizontal='center', vertical='center',wrap_text=True)
+
+    # 遍历工作表中所有行和单元格
+    for row in worksheet.iter_rows():  # 遍历每一行
+        for cell in row:        # 遍历行中的每个单元格
+            cell.alignment = center_alignment
+    workbook.save(xlsx_path)
+    logger.info(f"数据已成功导出并格式化到 {xlsx_path}")
+
 
 
 class BrowserSessionHandler:

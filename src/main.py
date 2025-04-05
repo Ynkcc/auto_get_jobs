@@ -100,8 +100,7 @@ async def login(page, account,loop):
         # page.context.browser.close() # close browser context instead of driver
         sys.exit(1)
     await manager.start_autosave()
-    await manager.save()
-    print(f"登陆成功。")
+    logger.info(f"登陆成功。")
     return manager
 
 async def main(config):
@@ -139,17 +138,14 @@ async def main(config):
     ws_client.start()
 
     for account in config.accounts:
-        # manager = login(driver, account)
-        manager = await login(page, account,loop)
-
+        manager = await login(page, account, loop)
         try:
-            url_list=build_search_url(config.job_search)
+            url_list = build_search_url(config.job_search)
             i = 1
             total=len(url_list)
             for url in url_list:
                 logger.info(f"当前第{i}个url，共{total}个")
                 i+=1
-                # driver.get(url)
                 await page.goto(url)
                 while True:
                     try:
@@ -183,6 +179,7 @@ async def main(config):
             await manager.clear_data()
             await page.context.close()
     running_event.clear()
+    export_to_xlsx(config.database.filename, config.database.excel_path)
     sys.exit(0)
 if __name__=='__main__':
     asyncio.run(main(config))

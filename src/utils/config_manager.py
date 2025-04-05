@@ -42,14 +42,10 @@ class LoggingConfig(BaseModel):
     path: str
     max_size: int
 
-class DatabaseExportConfig(BaseModel):
-    excel: bool
-    excel_path: str
-    keep_days: int
-
 class DatabaseConfig(BaseModel):
     filename: str
-    export: DatabaseExportConfig
+    export_excel: bool
+    excel_path: str
 
 class FilterBaseConfig(BaseModel):
     values: List[str]

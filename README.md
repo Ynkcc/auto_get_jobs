@@ -56,11 +56,8 @@
   - 逐步完善中
 
 **计划中** (按优先级排序)
-- [ ] 对paho-mqtt修改的部分，使用diff工具进行修改
-- [ ] 添加测试模式，不考虑薪资范围，仅投递不活跃的hr
-- [ ] 使用pyinstaller打包成exe
-  - [ ] 使用nuitka打包，体积更小
 - [ ] 使用qt创建一个图形化界面
+- [ ] 优化一下导出的excel的格式
 - [ ] 使用重试队列，解决MQTT客户端会漏消息的问题
 - [ ] 支持pdf发送简历
   - 即自动将pdf转成图片后再发送
@@ -74,6 +71,9 @@
 - [ ] 数据库数据共享
 - [ ] 识别公司是不是外包，查询社保人数等
 
+#### 项目当前架构图
+![项目架构图](diagram.png)
+Power by [ahmedkhaleel2004/gitdiagram](https://github.com/ahmedkhaleel2004/gitdiagram)
 
 ## LICENSE
 [GNU General Public License v3.0](./LICENSE)
@@ -81,7 +81,13 @@
 
 ### 更新日志
 
-##### [v0.5.0]
+##### [v0.6.0]
+- 使用`src/ws_client/patch.py`对paho-mqtt库进行修改
+- 添加测试模式，不考虑薪资范围，仅投递不活跃的hr
+- 使用使用nuitka打包成可执行文件直接运行，添加actions实现自动打包
+- 运行正常结束后，导出sqlite数据库为excel文件
+
+##### [v0.5.0](https://github.com/Ynkcc/auto_get_jobs/commit/e226aa759c755c8f4ca2d45b672c58c7ebcc8a2a)
 - 使用playwright框架替代selenium框架
   - selenium框架会触发boss的安全检查跳转，playwright则不会
 - 支持匹配薪资上限
