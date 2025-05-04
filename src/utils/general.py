@@ -329,7 +329,7 @@ def build_search_url(job_search):
             base_params_list.append({'city': city_code})
             continue
         for district in location_dicts[city_code]:
-            base_params_list.append({'city': city_code, 'areaBusiness': district})
+            base_params_list.append({'city': city_code, 'multiBusinessDistrict': district})
 
     if not params_config:  # 无过滤参数的特殊情况处理
         for params in base_params_list:

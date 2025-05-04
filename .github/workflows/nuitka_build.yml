@@ -48,7 +48,7 @@ jobs:
           script-name: src/main.py
           mode: onefile
           mingw64: true
-          playwright-include-browser: ${{ matrix.include_browser && 'chromium-1161' || 'none' }}
+          playwright-include-browser: ${{ matrix.include_browser && 'chromium-1169' || 'none' }}
 
       - name: Prepare Resources
         shell: bash
