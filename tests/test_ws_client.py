@@ -15,7 +15,7 @@ import socks
 import requests
 import paho.mqtt.client as mqtt
 import paho.mqtt
-from src.ws_client.techwolf_pb2 import TechwolfChatProtocol
+from app_core.ws_client.techwolf_pb2 import TechwolfChatProtocol
 from google.protobuf import json_format
 import secrets
 class WSclient(threading.Thread):

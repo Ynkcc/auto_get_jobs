@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CrawlerSettingsPageWidget</class>
+ <widget class="QWidget" name="CrawlerSettingsPageWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>700</width>
+    <height>500</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>爬虫配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="pageVerticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents_crawler">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>698</width>
+        <height>498</height>
+       </rect>
+      </property>
+      <layout class="QFormLayout" name="crawlerFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="browserTypeLabel">
+         <property name="text">
+          <string>浏览器类型:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="browserTypeComboBox">
+         <item>
+          <property name="text">
+           <string>edge</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>chromium(内置)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>自定义路径</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="headlessLabel">
+         <property name="text">
+          <string>无头模式:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QCheckBox" name="headlessCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="useDefaultDataDirLabel">
+         <property name="text">
+          <string>使用默认数据目录:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QCheckBox" name="useDefaultDataDirCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="rateLimitRateLabel">
+         <property name="text">
+          <string>速率限制（每秒令牌）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QDoubleSpinBox" name="rateLimitRateSpinBox">
+         <property name="value">
+          <double>1.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="rateLimitCapacityLabel">
+         <property name="text">
+          <string>速率限制（令牌容量）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QSpinBox" name="rateLimitCapacitySpinBox">
+         <property name="value">
+          <number>3</number>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="nextPageDelayLabel">
+         <property name="text">
+          <string>翻页延迟（秒）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QSpinBox" name="nextPageDelaySpinBox">
+         <property name="value">
+          <number>30</number>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="requestTimeoutLabel">
+         <property name="text">
+          <string>请求超时（秒）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QSpinBox" name="requestTimeoutSpinBox">
+         <property name="value">
+          <number>30</number>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="pageLoadTimeoutLabel">
+         <property name="text">
+          <string>页面加载超时（秒）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="1">
+        <widget class="QSpinBox" name="pageLoadTimeoutSpinBox">
+         <property name="value">
+          <number>60</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

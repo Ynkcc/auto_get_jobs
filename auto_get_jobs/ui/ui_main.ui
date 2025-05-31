@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ResumeAutoSender</class>
+ <widget class="QMainWindow" name="ResumeAutoSender">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>1439</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>auto_get_jobs</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+    QMainWindow {
+      background-color: #f5f7fa;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    QTabWidget::pane { /* This style might be removed if QTabWidget is gone */
+      border: 1px solid #d1d9e6;
+      border-radius: 8px;
+      padding: 5px;
+      background: white;
+      margin: 5px;
+    }
+    /* ... Keep other existing styles ... */
+   </string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainVerticalLayout">
+    <item>
+     <layout class="QHBoxLayout" name="navigationLayout">
+      <item>
+       <widget class="QPushButton" name="homeButton">
+        <property name="text">
+         <string>主页</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="backButton">
+        <property name="text">
+         <string>返回</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_nav">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="deliveryDetailsButton">
+        <property name="text">
+         <string>投递详细过程</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="historyButton">
+        <property name="text">
+         <string>历史记录</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="settingsButton">
+        <property name="text">
+         <string>设置</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="aboutButton">
+        <property name="text">
+         <string>关于</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QStackedWidget" name="mainStackedWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="dashboardPage">
+       <layout class="QVBoxLayout" name="dashboardLayout">
+        <item>
+         <layout class="QHBoxLayout" name="dashboardControlLayout">
+          <item>
+           <widget class="QLabel" name="statusLabel">
+            <property name="text">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;当前状态：&lt;/span&gt; 空闲&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_status">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="startStopBtn">
+            <property name="styleSheet">
+             <string notr="true">background-color: #0be881;</string>
+            </property>
+            <property name="text">
+             <string>开始自动投递</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pauseBtn">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>暂停</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QProgressBar" name="progressBar">
+          <property name="value">
+           <number>0</number>
+          </property>
+          <property name="textVisible">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="deliveryStatsGroupBox">
+          <property name="title">
+           <string>投递统计</string>
+          </property>
+          <layout class="QHBoxLayout" name="deliveryStatsLayout">
+           <item>
+            <widget class="QLabel" name="todayStatsLabel">
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;今日投递:&lt;/span&gt; 0/20&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;成功:&lt;/span&gt; 0&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;失败:&lt;/span&gt; 0&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="weekMonthTotalStatsLabel">
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;本周投递:&lt;/span&gt; 0&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;本月投递:&lt;/span&gt; 0&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;总计:&lt;/span&gt; 0&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="rateStatsLabel">
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;成功率:&lt;/span&gt; 0%&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;平均匹配度:&lt;/span&gt; 0%&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;响应率:&lt;/span&gt; 0%&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="logOutputGroupBox">
+          <property name="title">
+           <string>日志输出</string>
+          </property>
+          <layout class="QVBoxLayout" name="logOutputLayout">
+           <item>
+            <widget class="QTextEdit" name="logTextEdit">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="deliveryDetailsPage">
+       <layout class="QVBoxLayout" name="deliveryDetailsLayout">
+        <item>
+         <widget class="QLabel" name="deliveryDetailsTitle">
+          <property name="text">
+           <string>&lt;h2&gt;投递详细过程&lt;/h2&gt;</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTextEdit" name="liveLogTextEdit">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="historyPage">
+       <layout class="QVBoxLayout" name="historyPageLayout">
+        <item>
+         <widget class="QLabel" name="historyTitle">
+          <property name="text">
+           <string>&lt;h2&gt;投递历史记录&lt;/h2&gt;</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="historyTable">
+          <property name="columnCount">
+           <number>6</number>
+          </property>
+          <column>
+           <property name="text">
+            <string>时间</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>职位</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>公司</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>平台</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>状态</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>匹配度</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="settingsPage">
+       <layout class="QHBoxLayout" name="settingsPageLayout">
+        <item>
+         <widget class="QListWidget" name="settingsNavList">
+          <property name="maximumSize">
+           <size>
+            <width>150</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <item>
+           <property name="text">
+            <string>通用设置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>爬虫配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>申请配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>日志配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>数据库配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>AI 配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>岗位搜索配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>岗位筛选配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>通知配置</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>账号配置</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QStackedWidget" name="settingsContentStackedWidget">
+          <property name="currentIndex">
+           <number>-1</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="aboutPage">
+       <layout class="QVBoxLayout" name="aboutLayout">
+        <item>
+         <widget class="QLabel" name="aboutTitle">
+          <property name="text">
+           <string>&lt;h2&gt;关于auto_get_jobs&lt;/h2&gt;</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="versionLabel">
+          <property name="text">
+           <string>版本: 1.0.0</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTextEdit" name="aboutTextEdit">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="plainText">
+           <string>auto_get_jobs是一个帮助用户自动投递简历的应用程序。
+它集成了爬虫、AI 辅助分析、日志记录和通知功能，旨在提高求职效率。
+感谢您的使用！</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="verticalSpacer_about">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="styleSheet">
+    <string notr="true">color: #57606f;</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

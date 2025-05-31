@@ -4,9 +4,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import json
-from src.utils.general import build_search_url
+from app_core.utils.general_utils import build_search_url
 
-from src.utils.config_manager import ConfigManager
+from app_core.utils.config_manager import ConfigManager
 import yaml
 
 ConfigManager.load_config("config/config.yaml")

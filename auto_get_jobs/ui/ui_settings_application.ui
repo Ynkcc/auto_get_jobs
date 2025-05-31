@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ApplicationSettingsPageWidget</class>
+ <widget class="QWidget" name="ApplicationSettingsPageWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>700</width>
+    <height>500</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>申请配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="pageVerticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents_application">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>698</width>
+        <height>498</height>
+       </rect>
+      </property>
+      <layout class="QFormLayout" name="applicationFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="sendResumeImageLabel">
+         <property name="text">
+          <string>发送简历图片:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QCheckBox" name="sendResumeImageCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="resumeImageFileLabel">
+         <property name="text">
+          <string>简历图片文件:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="resumeImageFileLineEdit">
+         <property name="text">
+          <string>data/resume.png</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="enableAiGreetingLabel">
+         <property name="text">
+          <string>AI 生成招呼语:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QCheckBox" name="enableAiGreetingCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="greetingPromptLabel">
+         <property name="text">
+          <string>招呼语提示词:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QTextEdit" name="greetingPromptTextEdit">
+         <property name="plainText">
+          <string>你是一个专业的求职辅助AI，请严格遵循以下规则生成打招呼语：
+1. 基于用户简历的【真实经历】和【实际技能】，禁止任何虚构或夸张
+2. 保持谦逊得体的口语表达，避免过度自我吹嘘
+3. 重点突出与职位需求的【精准匹配点】
+4. 使用&quot;意向表达+匹配说明+礼貌收尾&quot;三段式结构
+5. 总字数控制在120字以内
+6. 禁止使用感叹号等夸张符号
+7. 仅提及与岗位描述相关的优势
+8. 示例参考：
+&quot;您好，我对[岗位名称]感兴趣，我的[相关经验/技能]与该岗位要求较为契合。[简明列举1-2个真实匹配点]。如果合适希望能进一步沟通。&quot;</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

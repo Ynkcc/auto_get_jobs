@@ -3,8 +3,8 @@ import logging
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.utils.ai_analyzer import AiAnalyzer
-from src.utils.config_manager import ConfigManager
+from app_core.utils.ai_analyzer_core import AiAnalyzer
+from app_core.utils.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

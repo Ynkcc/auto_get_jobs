@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>JobCheckSettingsPageWidget</class>
+ <widget class="QWidget" name="JobCheckSettingsPageWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>700</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>岗位筛选配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="pageVerticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents_job_check">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>698</width>
+        <height>598</height>
+       </rect>
+      </property>
+      <layout class="QFormLayout" name="jobCheckFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="testModeLabel">
+         <property name="text">
+          <string>测试模式:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QCheckBox" name="testModeCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="salaryRangeLabel">
+         <property name="text">
+          <string>期望薪资范围（K）:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <layout class="QHBoxLayout" name="salaryRangeLayout">
+         <item>
+          <widget class="QDoubleSpinBox" name="minDesiredSalarySpinBox">
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
+           <property name="value">
+            <double>1.100000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="salaryRangeSeparatorLabel">
+           <property name="text">
+            <string>-</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="maxDesiredSalarySpinBox">
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
+           <property name="value">
+            <double>11.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="inactiveStatusLabel">
+         <property name="text">
+          <string>HR 活跃状态排除项:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QListWidget" name="inactiveStatusListWidget">
+         <item>
+          <property name="text">
+           <string>本月活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>2月内活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>3月内活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>4月内活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>5月内活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>半年前活跃</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>近半年活跃</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="checkInsuranceLabel">
+         <property name="text">
+          <string>检查社保人数:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QCheckBox" name="checkInsuranceCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="minInsuredLabel">
+         <property name="text">
+          <string>最小参保人数:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QSpinBox" name="minInsuredSpinBox">
+         <property name="maximum">
+          <number>99999</number>
+         </property>
+         <property name="value">
+          <number>10</number>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="excludeOutsourceLabel">
+         <property name="text">
+          <string>排除外包公司:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QCheckBox" name="excludeOutsourceCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="checkVisitedLabel">
+         <property name="text">
+          <string>检查已访问过的岗位:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QCheckBox" name="checkVisitedCheckBox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

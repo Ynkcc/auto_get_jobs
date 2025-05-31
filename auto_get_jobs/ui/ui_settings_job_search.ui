@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>JobSearchSettingsPageWidget</class>
+ <widget class="QWidget" name="JobSearchSettingsPageWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>700</width>
+    <height>1200</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>岗位搜索配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="pageVerticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents_job_search">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>680</width>
+        <height>1180</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="jobSearchVLayout">
+       <item>
+        <widget class="QGroupBox" name="cityGroupBox">
+         <property name="title">
+          <string>目标城市</string>
+         </property>
+         <layout class="QVBoxLayout" name="cityLayout">
+          <item>
+           <widget class="QListWidget" name="cityListWidget">
+            <item>
+             <property name="text">
+              <string>海口</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>文昌</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="cityAddLayout">
+            <item>
+             <widget class="QLineEdit" name="cityLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addCityButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeCityButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="queryGroupBox">
+         <property name="title">
+          <string>搜索关键词</string>
+         </property>
+         <layout class="QVBoxLayout" name="queryLayout">
+          <item>
+           <widget class="QListWidget" name="queryListWidget">
+            <item>
+             <property name="text">
+              <string>桌面运维</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="queryAddLayout">
+            <item>
+             <widget class="QLineEdit" name="queryLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addQueryButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeQueryButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="degreeGroupBox">
+         <property name="title">
+          <string>学历要求</string>
+         </property>
+         <layout class="QVBoxLayout" name="degreeLayout">
+          <item>
+           <widget class="QListWidget" name="degreeListWidget"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="degreeAddLayout">
+            <item>
+             <widget class="QLineEdit" name="degreeLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addDegreeButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeDegreeButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="degreeCombineCheckBox">
+            <property name="text">
+             <string>组合学历要求</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="experienceGroupBox">
+         <property name="title">
+          <string>经验要求</string>
+         </property>
+         <layout class="QVBoxLayout" name="experienceLayout">
+          <item>
+           <widget class="QListWidget" name="experienceListWidget">
+            <item>
+             <property name="text">
+              <string>1-3年</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>经验不限</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>1年以内</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="experienceAddLayout">
+            <item>
+             <widget class="QLineEdit" name="experienceLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addExperienceButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeExperienceButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="experienceCombineCheckBox">
+            <property name="text">
+             <string>组合经验要求</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="positionGroupBox">
+         <property name="title">
+          <string>岗位名称过滤</string>
+         </property>
+         <layout class="QVBoxLayout" name="positionLayout">
+          <item>
+           <widget class="QListWidget" name="positionListWidget"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="positionAddLayout">
+            <item>
+             <widget class="QLineEdit" name="positionLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addPositionButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removePositionButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="positionCombineCheckBox">
+            <property name="text">
+             <string>组合岗位名称过滤</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="industryGroupBox">
+         <property name="title">
+          <string>行业过滤</string>
+         </property>
+         <layout class="QVBoxLayout" name="industryLayout">
+          <item>
+           <widget class="QListWidget" name="industryListWidget"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="industryAddLayout">
+            <item>
+             <widget class="QLineEdit" name="industryLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addIndustryButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeIndustryButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="industryCombineCheckBox">
+            <property name="text">
+             <string>组合行业过滤</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="salaryGroupBox">
+         <property name="title">
+          <string>薪资范围过滤（K）</string>
+         </property>
+         <layout class="QHBoxLayout" name="salaryLayout">
+          <item>
+           <widget class="QSpinBox" name="minSalarySpinBox">
+            <property name="suffix">
+             <string>K</string>
+            </property>
+            <property name="maximum">
+             <number>999</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="salarySeparatorLabel">
+            <property name="text">
+             <string>-</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="maxSalarySpinBox">
+            <property name="suffix">
+             <string>K</string>
+            </property>
+            <property name="maximum">
+             <number>999</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="jobTypeGroupBox">
+         <property name="title">
+          <string>工作类型</string>
+         </property>
+         <layout class="QHBoxLayout" name="jobTypeLayout">
+          <item>
+           <widget class="QCheckBox" name="fullTimeCheckBox">
+            <property name="text">
+             <string>全职</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="partTimeCheckBox">
+            <property name="text">
+             <string>兼职</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="scaleGroupBox">
+         <property name="title">
+          <string>公司规模</string>
+         </property>
+         <layout class="QVBoxLayout" name="scaleLayout">
+          <item>
+           <widget class="QListWidget" name="scaleListWidget"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="scaleAddLayout">
+            <item>
+             <widget class="QLineEdit" name="scaleLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addScaleButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeScaleButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="scaleCombineCheckBox">
+            <property name="text">
+             <string>组合公司规模</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="stageGroupBox">
+         <property name="title">
+          <string>公司融资阶段</string>
+         </property>
+         <layout class="QVBoxLayout" name="stageLayout">
+          <item>
+           <widget class="QListWidget" name="stageListWidget"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="stageAddLayout">
+            <item>
+             <widget class="QLineEdit" name="stageLineEdit"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addStageButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeStageButton">
+              <property name="text">
+               <string>移除</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="stageCombineCheckBox">
+            <property name="text">
+             <string>组合融资阶段</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AiSettingsPageWidget</class>
+ <widget class="QWidget" name="AiSettingsPageWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>700</width>
+    <height>500</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>AI 配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="pageVerticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents_ai">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>698</width>
+        <height>498</height>
+       </rect>
+      </property>
+      <layout class="QFormLayout" name="aiFormLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="aiProviderLabel">
+         <property name="text">
+          <string>服务商:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="aiProviderComboBox">
+         <item>
+          <property name="text">
+           <string>azure</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>openai</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="aiModelLabel">
+         <property name="text">
+          <string>模型名称:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="aiModelLineEdit">
+         <property name="text">
+          <string>DeepSeek-R1</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="aiTemperatureLabel">
+         <property name="text">
+          <string>温度:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QDoubleSpinBox" name="aiTemperatureSpinBox">
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.200000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="aiApiKeyLabel">
+         <property name="text">
+          <string>API 密钥:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLineEdit" name="aiApiKeyLineEdit">
+         <property name="echoMode">
+          <enum>QLineEdit::EchoMode::Password</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="aiApiUrlLabel">
+         <property name="text">
+          <string>API URL:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="aiApiUrlLineEdit"/>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="aiPromptLabel">
+         <property name="text">
+          <string>AI 分析提示词:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QTextEdit" name="aiPromptTextEdit">
+         <property name="plainText">
+          <string>帮助用户判断这个岗位是否合适
+岗位应与用户提供的方向一致
+输出严格遵循以下规则：只返回&quot;true&quot;或&quot;false&quot;</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="jobRequirementsPromptLabel">
+         <property name="text">
+          <string>岗位需求提示词:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QTextEdit" name="jobRequirementsPromptTextEdit">
+         <property name="plainText">
+          <string>我想要找一份it行业的工作。偏技术性的岗位
+不考虑售后、售前、外包或教育行业。接受项目制或者兼职，实习形式的工作</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="resumeForAiFileLabel">
+         <property name="text">
+          <string>AI 简历文件:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="1">
+        <widget class="QLineEdit" name="resumeForAiFileLineEdit">
+         <property name="text">
+          <string>data/resume_for_ai.md</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
