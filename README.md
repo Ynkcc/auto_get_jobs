@@ -1,32 +1,38 @@
 # BOSS直聘自动投简历
 > 仅供Python爱好者，交流学习
 
-### 其他同类项目
-- [yangfeng20/boss_batch_push](https://github.com/yangfeng20/boss_batch_push) 油猴脚本
-- [loks666/get_jobs](https://github.com/loks666/get_jobs) Java项目，多平台
-- [lastsunday/job-hunting](https://github.com/lastsunday/job-hunting) 浏览器插件，多平台
-- [Ocyss/boos-helper](https://github.com/Ocyss/boos-helper) 浏览器插件
-- [IceyOrange/AutoBOSS](https://github.com/IceyOrange/AutoBOSS)  Python项目 
-- [rebibabo/Job-Hunting-Agent](https://github.com/rebibabo/Job-Hunting-Agent) Python项目
-
-本项目fork自 [SanThousand/auto_get_jobs](https://github.com/SanThousand/auto_get_jobs)
 ## 项目简介
-> 请查看 **[原项目](https://github.com/SanThousand/auto_get_jobs)**
+boss直聘自动投递，ai根据要求进行筛选
 
 ## 使用说明
-详细教程请点击 [详细部署教程](docs/部署指南.md)  
-初次使用，复制`data`目录下的`config.yaml.sample`，重命名为`config.yaml`后进行修改，其余步骤参考原项目
+1. 下载[release](https://github.com/Ynkcc/auto_get_jobs/releases) 中对应系统的压缩包，解压
+
+2. 修改`config`目录下的`config.yaml`
+
+3. 将`resume_for_ai.md`、`resume.png`,改成你的简历文字说明，简历图片
+
+4. 打开控制台,运行 main 程序
+
+ >如果你使用python脚本直接运行。
+ >
+ >请安装好依赖库后，执行`/src/ws_client/patch.py`
 
 可以使用以下插件 [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) 查看保存的数据库`jobs.db`
 
 ---
-目前仍在开发，部分功能可能不可用
+计划做一个用户界面，但是涉及大量重构。估计会鸽。
 
-如果你在使用过程中遇到bug，请提交反馈
+项目内文档部分过时，具体以代码为准
 
-如果你喜欢PYTHON，且愿意为本项目做贡献。欢迎PR
+如果你在使用中遇到困难，可以前往交流群 `487194990`寻求帮助
 
-交流群 `487194990`
+欢迎为本项目做贡献。欢迎PR。佛性维护，欢迎接手。
+
+---
+
+ai模型提供商可以考虑使用azure，学生每年赠送100$。
+
+而且deepseek-r1模型响应也快
 
 ---
 #### 项目计划
@@ -70,14 +76,24 @@
 - [ ] 让ai生成搜索关键词，扩展可接受岗位
 - [ ] 数据库数据共享
 - [ ] 识别公司是不是外包，查询社保人数等
-
-#### 项目当前架构图
-![项目架构图](diagram.png)
-Power by [ahmedkhaleel2004/gitdiagram](https://github.com/ahmedkhaleel2004/gitdiagram)
+---
 
 ## LICENSE
 [GNU General Public License v3.0](./LICENSE)
 
+---
+
+### 其他同类项目
+- [yangfeng20/boss_batch_push](https://github.com/yangfeng20/boss_batch_push) 油猴脚本
+- [loks666/get_jobs](https://github.com/loks666/get_jobs) Java项目，多平台
+- [lastsunday/job-hunting](https://github.com/lastsunday/job-hunting) 浏览器插件，多平台
+- [Ocyss/boos-helper](https://github.com/Ocyss/boos-helper) 浏览器插件
+- [IceyOrange/AutoBOSS](https://github.com/IceyOrange/AutoBOSS)  Python项目 
+- [rebibabo/Job-Hunting-Agent](https://github.com/rebibabo/Job-Hunting-Agent) Python项目
+
+本项目fork自 [SanThousand/auto_get_jobs](https://github.com/SanThousand/auto_get_jobs)
+
+---
 
 ### 更新日志
 

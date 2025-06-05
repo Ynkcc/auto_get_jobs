@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 import sys
 from queue import Queue
 import threading
-from utils.general import * # 保留 general 的导入，可能其他地方用到
+from utils.general import *
 from utils.db_utils import DatabaseManager
 from job_handler import JobHandler
 from ws_client.ws_client import WsClient
@@ -57,7 +57,7 @@ import asyncio
 import concurrent.futures
 import signal
 import sys
-from playwright.async_api import async_playwright, TimeoutError, Page, Response # 导入 Response
+from playwright.async_api import async_playwright, TimeoutError, Page, Response
 
 async def start_loop(loop):
     asyncio.set_event_loop(loop)
@@ -149,7 +149,7 @@ async def main(config):
                 # --- 新增：用于存储从API获取的数据 ---
                 api_jobs_data = []
                 has_more_data = True # 初始假设有数据
-                page_number = 1 # 用于跟踪API分页
+               
 
                 # --- 新增：Response 监听器处理函数 ---
                 async def handle_response(response: Response):
@@ -217,8 +217,6 @@ async def main(config):
                 # --- 导航到页面 ---
                 try:
                     await page.goto(url, wait_until='domcontentloaded', timeout=config.crawler.page_load_timeout * 1000)
-                    # 等待第一次API调用完成 (给一点时间让监听器捕获)
-                    await page.wait_for_timeout(3000) # 等待3秒，可以调整
                 except TimeoutError:
                     logger.error(f"页面加载超时: {url}")
                     page.remove_listener("response", handle_response) # 移除监听器
@@ -255,13 +253,9 @@ async def main(config):
                     # 如果 API 显示还有更多数据，则滚动页面
                     if has_more_data:
                         logger.info("滚动页面以加载更多数据...")
-                        # 尝试滚动页面触发新的API请求
-                        # 使用 mouse.wheel 进行平滑滚动，或者 evaluate 执行 JS 滚动
-                        await page.mouse.wheel(0, 1000) # 向下滚动 1000 像素
-                        # await page.evaluate('window.scrollBy(0, window.innerHeight);') # 滚动一个视口高度
-                        page_number += 1
-                        # 等待一段时间让新的API请求发出并被监听器捕获
-                        await page.wait_for_timeout(5000) # 等待5秒，可以调整或使用 wait_for_response
+                        await page.mouse.wheel(0, 1000)
+                        await page.wait_for_timeout(5000)
+                       
                     else:
                         logger.info("没有更多数据，结束当前URL的处理。")
                         break # 跳出内层 while 循环
