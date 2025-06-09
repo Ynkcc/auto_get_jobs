@@ -258,16 +258,15 @@ def build_search_url(job_search):
     location_dicts = {}
     city_code_map = params_data["cityCode"]
 
-    # 处理区域配置
+    # 处理 areas 配置（优先级高）
     if job_search.areas:
-        # 处理明确指定的区域
         for city_name, districts in job_search.areas.items():
             if city_name not in city_code_map:
                 logger.warning(f"未找到城市 [{city_name}] 的编码，已跳过")
                 continue
 
             city_entry = city_code_map[city_name]
-            city_code = list(city_entry.keys())[0]  # 获取城市编码
+            city_code = list(city_entry.keys())[0]
 
             valid_districts = [
                 city_entry[city_code][district]
@@ -275,7 +274,6 @@ def build_search_url(job_search):
                 if district in city_entry[city_code]
             ]
             
-            # 过滤无效区域
             invalid = set(districts) - set(city_entry[city_code].keys())
             if invalid:
                 logger.warning(f"城市 [{city_name}] 下未找到区域: {', '.join(invalid)}")
@@ -283,17 +281,21 @@ def build_search_url(job_search):
             if valid_districts:
                 location_dicts.setdefault(city_code, []).extend(valid_districts)
     else:
-        # 处理城市全集
-        for city_name in job_search.city:
+        # 处理 city 配置
+        for city_name in job_search.city.values:
             if city_name not in city_code_map:
                 logger.warning(f"未找到城市 [{city_name}] 的编码，已跳过")
                 continue
 
             city_entry = city_code_map[city_name]
             city_code = list(city_entry.keys())[0]
-            location_dicts[city_code] = list(city_entry[city_code].values())
 
-    # 参数验证
+            # 根据 expand_to_district 决定是否添加区域
+            if job_search.city.expand_to_district:
+                location_dicts[city_code] = list(city_entry[city_code].values())
+            else:
+                location_dicts[city_code] = [] # 不展开到区域，则区域列表为空
+
     if not location_dicts:
         raise ValueError("未找到有效的城市/区域配置")
 
@@ -304,44 +306,44 @@ def build_search_url(job_search):
         codes = [str(param_map[v]) for v in filter_config.values]
         return [','.join(codes)] if filter_config.combine and codes else codes
 
-    # 构建参数配置（支持合并逻辑）
+    # 构建参数配置
     params_config = {
-        # 处理需要合并参数的字段
         'degree': process_filter(job_search.degree, params_data["degree"]),
         'position': process_filter(job_search.position, params_data["position"]),
         'industry': process_filter(job_search.industry, params_data["industry"]),
         'experience': process_filter(job_search.experience, params_data["experience"]),
         'scale': process_filter(job_search.scale, params_data["scale"]),
         'stage': process_filter(job_search.stage, params_data["stage"]),
-        # 处理普通列表参数
         'salary': [str(params_data["salary"][v]) for v in job_search.salary],
         'jobType': [str(params_data["jobType"][v]) for v in job_search.jobType],
         'query': job_search.query
     }
-
-    # 过滤空参数
     params_config = {k: v for k, v in params_config.items() if v}
 
-    url_list = []
+    # -- 修改开始 --
     base_params_list = []
-    for city_code in location_dicts.keys():
-        if not location_dicts[city_code]:
+    for city_code, districts in location_dicts.items():
+        # 如果区域列表为空（包括 areas 为空或 city.expand_to_district 为 false 的情况）
+        # 则只搜索城市
+        if not districts:
             base_params_list.append({'city': city_code})
             continue
-        for district in location_dicts[city_code]:
-            base_params_list.append({'city': city_code, 'multiBusinessDistrict': district})
 
-    if not params_config:  # 无过滤参数的特殊情况处理
+        # 如果区域列表不为空，则遍历所有区域
+        for district_code in districts:
+            base_params_list.append({'city': city_code, 'multiBusinessDistrict': district_code})
+    # -- 修改结束 --
+    
+    url_list = []
+    if not params_config:
         for params in base_params_list:
             param_str = '&'.join(f"{k}={v}" for k, v in params.items())
             url_list.append(f"{base_url}?{param_str}")
         return url_list
     
-    # 生成参数组合的笛卡尔积
     param_keys = list(params_config.keys())
     param_combinations = list(itertools.product(*params_config.values()))
 
-    # 合并基础参数和过滤参数
     for base_param in base_params_list:
         for combination in param_combinations:
             merged_params = base_param.copy()

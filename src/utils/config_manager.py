@@ -51,8 +51,13 @@ class FilterBaseConfig(BaseModel):
     values: List[str]
     combine: bool
 
+# 新增 CityConfig 模型
+class CityConfig(BaseModel):
+    values: List[str]
+    expand_to_district: bool # 是否展开到地区
+
 class JobSearchConfig(BaseModel):
-    city: List[str]
+    city: CityConfig # 修改 city 字段类型
     query: List[str]
     areas: Dict[str, List[str]]
     degree: FilterBaseConfig

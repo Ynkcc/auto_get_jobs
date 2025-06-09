@@ -5,9 +5,15 @@ from PIL import Image
 可以将pdf简历转成图片，可用于投递图片简历
 """
 
-# 转换PDF为图片对象列表
-images = convert_from_path("resume.pdf",poppler_path=r"D:\Desktop\poppler-24.08.0\Library\bin")
+# sudo apt-get install poppler-utils
+# images = convert_from_path("resume.pdf",poppler_path=r"D:\Desktop\poppler-24.08.0\Library\bin")
+# windows可以手动下载二进制文件添加到path 或者手动指定路径
 
+# 转换PDF为图片对象列表
+images_1 = convert_from_path("resume.pdf")
+images_2 =convert_from_path("面试用.pdf")
+images =images_1 + images_2
+print(len(images))
 # 计算总高度和最大宽度
 total_height = sum(img.height for img in images)
 max_width = max(img.width for img in images)
