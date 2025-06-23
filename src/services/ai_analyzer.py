@@ -2,13 +2,26 @@
 import logging
 import re
 from openai import AsyncOpenAI, AsyncAzureOpenAI, OpenAIError
+from pydantic import BaseModel
+import instructor  # 导入 instructor
 
 from ..common.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
+# 定义用于结构化输出的 Pydantic 模型
+# instructor 会确保AI的输出严格遵循此结构
+class AIAnalysisResult(BaseModel):
+    match_conclusion: bool
+    reasoning: str
+
+
 class AiAnalyzer:
     def __init__(self):
+        """
+        初始化 AiAnalyzer，加载配置并设置AI客户端。
+        使用 instructor 来增强(patch)原始的 OpenAI 客户端，以便可靠地进行结构化输出。
+        """
         config = ConfigManager.get_config()
         config_ai = config.ai
         config_greeting = config.application.greeting
@@ -22,7 +35,11 @@ class AiAnalyzer:
         self.ai_prompt = config_ai.prompt
         self.greeting_prompt = config_greeting.greeting_prompt
         
-        self.client = self._initialize_client(config_ai)
+        # 使用 instructor 来增强 client
+        base_client = self._initialize_client(config_ai)
+        # --- 修改点 ---
+        # 由于模型不支持 'TOOLS' 模式，我们切换到更兼容的 'JSON' 模式
+        self.client = instructor.patch(base_client, mode=instructor.Mode.JSON)
 
     def _initialize_client(self, config_ai):
         """根据配置初始化 OpenAI 或 AzureOpenAI 客户端"""
@@ -45,7 +62,7 @@ class AiAnalyzer:
             raise ValueError(f"不支持的AI提供商: {self.provider}")
 
     def _load_user_requirements(self):
-        """从文件加载用户简历"""
+        """从文件加载用于AI分析的简历内容"""
         try:
             with open(self.resume_file_name, 'r', encoding='utf-8') as f:
                 return f.read()
@@ -72,30 +89,41 @@ class AiAnalyzer:
             return None
 
     async def ai_hr_check(self, job_detail):
-        """使用AI分析职位是否匹配"""
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": self.ai_prompt},
-                {"role": "user", "content": f"岗位要求：{job_detail}"},
-                {"role": "user", "content": f"用户简历：{self.resume_for_ai}"},
-                {"role": "user", "content": f"用户对工作岗位的要求：{self.job_requirements_prompt}"}
-            ],
-            "temperature": self.temperature,
-        }
+        """
+        使用AI分析职位是否匹配，并通过 instructor 返回结构化结果。
+        """
+        messages = [
+            {"role": "system", "content": self.ai_prompt},
+            {"role": "user", "content": f"岗位要求：{job_detail}"},
+            {"role": "user", "content": f"用户简历：{self.resume_for_ai}"},
+            {"role": "user", "content": f"用户对工作岗位的要求：{self.job_requirements_prompt}"}
+        ]
         try:
-            response = await self.client.chat.completions.create(**payload)
-            origin_content = response.choices[0].message.content.lower()
-            match = re.match(r"<think>(.*?)</think>(.*)", origin_content, re.DOTALL)
-            ai_think = match.group(1).strip() if match else ""
-            content = match.group(2) if match else origin_content
-            return "true" in content, ai_think
+            # 在 JSON 模式下，instructor 同样会自动处理 response_model
+            response_obj = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                response_model=AIAnalysisResult
+            )
+
+            # 直接从返回的Pydantic对象中获取数据
+            match_conclusion = response_obj.match_conclusion
+            raw_reasoning = response_obj.reasoning
+            
+            # 按要求保留对 <think> 标签的过滤逻辑
+            match = re.match(r"<think>(.*?)</think>(.*)", raw_reasoning, re.DOTALL)
+            clean_reasoning = match.group(2).strip() if match else raw_reasoning
+            
+            return match_conclusion, clean_reasoning
+
         except OpenAIError as e:
             logger.error(f"AI分析失败: {e}")
             return False, f"AI分析异常: {e}"
 
     async def close(self):
-        """关闭 aiohttp.ClientSession"""
+        """关闭AI客户端会话以释放资源。"""
         if self.client:
-            await self.client.aclose()
-            logger.info("AiAnalyzer的OpenAI客户端会话已关闭。")
+            # instructor 增强过的 client 同样支持 aclose
+            await self.client.close()
+            logger.info("AiAnalyzer 客户端会话已关闭")

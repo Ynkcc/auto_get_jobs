@@ -57,12 +57,9 @@ class WsClient:
 
     def _on_message(self, client, userdata, msg):
         try:
-            # 注意：实际的Protobuf消息体可能需要根据抓包情况调整
-            # 这里的 TechwolfChatProtocol 是一个示例
             protocol = techwolf_pb2.TechwolfChatProtocol()
             protocol.ParseFromString(msg.payload)
             logger.debug(f"收到消息: {protocol}")
-            # 可在此处添加对收到消息的处理逻辑
         except Exception as e:
             logger.error(f"处理接收到的消息时出错: {e}", exc_info=True)
 
@@ -83,38 +80,26 @@ class WsClient:
         self.client.on_disconnect = self._on_disconnect
 
         self.client.tls_set(ssl.CERT_NONE)
-        # 注意：这里的header格式和参数可能需要根据最新抓包结果调整
         self.client.ws_options_set(path="/ws-v2", headers={"X-CLIENT-ID": client_id})
         self.client.username_pw_set(str(self.user_id), self.wt2)
 
-
-    def _send_message(self, topic: str, payload: bytes):
-        if not self.is_connected:
-            logger.warning("WebSocket未连接，无法发送消息")
-            return
-        self.client.publish(topic, payload, qos=1)
-
-    async def _send_greeting_message(self, to_uid: str, job_data: dict, security_id: str):
+    async def _send_greeting_message(self, to_uid: str, job_data: dict):
         """发送文本打招呼语和简历图片"""
-        job_card = job_data.get("jobCard", {})
-        job_name = job_card.get("jobName", "这个职位")
-        company = job_card.get("brandName", "贵公司")
+        job_info = job_data.get("jobInfo", {})
+        brand_info = job_data.get("brandComInfo", {})
+        job_name = job_info.get("jobName", "这个职位")
+        company = brand_info.get("brandName", "贵公司")
         
-        # 1. 生成招呼语
         greeting_text = self.app_config.greeting.greeting_prompt.format(job_name=job_name, company=company)
         
-        # 2. 发送文本消息 (Protobuf结构需根据实际情况调整)
-        # text_msg = techwolf_pb2.Message(...)
-        # self._send_message(f"p/u/g/{self.user_id}", text_msg.SerializeToString())
         logger.info(f"已向 {to_uid} 发送招呼语: {greeting_text} (模拟发送)")
 
-        # 3. 发送简历图片
         if self.app_config.send_resume_image and self.resume_image_md5:
             image_path = self.app_config.resume_image_file
+            # securityId 在顶层
+            security_id = job_data.get('securityId')
             image_result = await zhipin_api.upload_image(image_path, security_id, self.resume_image_md5)
             if image_result:
-                # img_msg = techwolf_pb2.Message(...)
-                # self._send_message(f"p/u/g/{self.user_id}", img_msg.SerializeToString())
                 logger.info(f"已向 {to_uid} 发送简历图片 (模拟发送)")
             else:
                 logger.error(f"上传简历图片失败，无法发送给 {to_uid}")
@@ -123,7 +108,7 @@ class WsClient:
         """主运行循环，负责保持WebSocket连接"""
         await zhipin_api.get_user_info()
         self.user_id = zhipin_api.get_user_id()
-        self.wt2 = zhipin_api.get_wt2()
+        self.wt2 = await zhipin_api.get_wt2()
         
         if not self.user_id or not self.wt2:
             logger.error("无法获取用户信息或wt2，WsClient无法启动")
@@ -146,21 +131,22 @@ class WsClient:
         if not self.is_connected:
             logger.warning("WebSocket未连接，无法发起沟通")
             return
-            
-        job_card = job_data.get('jobCard', {})
-        job_name = job_card.get('jobName')
-        securityId = job_data.get('securityId')
+        
+        job_info = job_data.get('jobInfo', {})
+        job_name = job_info.get('jobName')
+        security_id = job_data.get('securityId') # securityId 在顶层
+        
         logger.info(f"WsClient 收到任务，准备与 '{job_name}' 的HR发起沟通")
 
         try:
-            encrypt_job_id = job_card.get('encryptJobId')
+            encrypt_job_id = job_info.get('encryptId')
             lid = job_data.get('lid')
 
-            if not all([encrypt_job_id, securityId, lid]):
+            if not all([encrypt_job_id, security_id, lid]):
                 logger.error("缺少必要参数 (encryptJobId, securityId, lid)，无法发起沟通")
                 return
 
-            result = await zhipin_api.start_chat(securityId, encrypt_job_id, lid)
+            result = await zhipin_api.start_chat(security_id, encrypt_job_id, lid)
 
             if result and result.get('code') == 0:
                 logger.info(f"成功与 '{job_name}' 的HR建立沟通")
@@ -178,16 +164,15 @@ class WsClient:
             logger.warning("WebSocket未连接，无法发送招呼语")
             return
 
-        job_card = job_data.get("jobCard", {})
-        encrypt_geek_id = job_card.get("encryptGeekId")
-        security_id = job_data.get("securityId")
+        boss_info = job_data.get("bossInfo", {})
+        encrypt_geek_id = boss_info.get("encryptUserId")
         
         if not encrypt_geek_id:
-            logger.error("职位数据中未找到对方ID (encryptGeekId)，无法发送消息")
+            logger.error("职位数据中未找到对方ID (encryptUserId)，无法发送消息")
             return
 
         try:
-            await self._send_greeting_message(encrypt_geek_id, job_data, security_id)
+            await self._send_greeting_message(encrypt_geek_id, job_data)
             await event_manager.publish("application_sent_successfully", job_data=job_data)
         except Exception as e:
             logger.error(f"处理投递申请时发生异常: {e}", exc_info=True)

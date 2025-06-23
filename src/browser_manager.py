@@ -8,7 +8,6 @@ from playwright.async_api import async_playwright, Response, Page
 from typing import List, Dict
 
 from .common.event_manager import event_manager
-from .common.rate_limiter import AsyncTokenBucket
 from .common.file_utils import build_search_url
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,6 @@ class BrowserManager:
         self.p_config = config.crawler.playwright
         self.accounts_config = config.accounts[0] if config.accounts else None
         self.job_search_config = config.job_search
-        self.rate_limit_config = config.crawler.rate_limit
         
         self.stop_flag = stop_flag
         self.page = None
@@ -26,17 +24,8 @@ class BrowserManager:
         self.browser = None
         self.save_task = None
 
-        self.token_bucket = AsyncTokenBucket(
-            rate=self.rate_limit_config['rate'],
-            capacity=self.rate_limit_config['capacity']
-        )
-        logger.info(
-            f"令牌桶限速器已初始化：速率 {self.rate_limit_config['rate']} req/s, "
-            f"容量 {self.rate_limit_config['capacity']}"
-        )
-
     async def _handle_response(self, response: Response):
-        """监听职位列表API响应，并发布会话更新事件"""
+        """监听职位列表API响应"""
         if "wapi/zpgeek/search/joblist.json" in response.url:
             logger.debug(f"监听到职位列表API响应: {response.url}")
             try:
@@ -47,15 +36,6 @@ class BrowserManager:
                         logger.warning("本次API响应中职位列表为空")
                         return
                     
-                    cookies = await self.page.context.cookies()
-                    headers = {
-                        'User-Agent': await self.page.evaluate('() => navigator.userAgent'),
-                    }
-                    
-                    # 发布cookies更新事件，供zhipin_api等模块使用
-                    await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
-                    
-                    # 发布职位列表事件
                     await event_manager.publish("job_list_found", jobs=job_list)
                 else:
                     logger.error(f"接口响应数据格式错误: {data}")
@@ -64,7 +44,6 @@ class BrowserManager:
 
     async def _load_login_data(self) -> bool:
         """从文件加载登录数据（cookies）"""
-        # 使用 account.login_data_file 替代硬编码路径
         login_file = self.accounts_config.login_data_file if self.accounts_config else None
         if not login_file or not os.path.exists(login_file):
             logger.warning("登录数据文件不存在或未配置，将进行扫码登录")
@@ -114,16 +93,17 @@ class BrowserManager:
             return False
     
     async def _start_autosave_timer(self, interval=60):
-        """启动定时保存登录数据的任务"""
-        logger.info(f"自动保存登录数据任务已启动，间隔: {interval}秒")
+        """启动定时保存登录数据并发布更新事件的任务"""
+        logger.info(f"自动保存与会话更新任务已启动，间隔: {interval}秒")
         
         async def saver():
             while not self.stop_flag.is_set():
                 await self._save_login_data()
-                # 保存后，也发布一次会话更新事件
+                
                 cookies = await self.page.context.cookies()
                 headers = {'User-Agent': await self.page.evaluate('() => navigator.userAgent')}
                 await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
+                
                 await asyncio.sleep(interval)
 
         self.save_task = asyncio.create_task(saver())
@@ -184,9 +164,8 @@ class BrowserManager:
                 if self.stop_flag.is_set():
                     logger.info("接收到停止信号，停止爬取新页面")
                     break
-
-                await self.token_bucket.acquire(1)
-                logger.info(f"令牌获取成功，正在导航至: {url}")
+                
+                logger.info(f"正在导航至: {url}")
                 await self.page.goto(url, wait_until='domcontentloaded', timeout=60000)
                 
                 for i in range(self.p_config.scroll_pages):

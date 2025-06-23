@@ -11,7 +11,7 @@ from .core.job_filter import JobFilter
 from .core.job_analyzer import JobAnalyzer
 from .services.ws_client.client import WsClient
 from .common.db_manager import DatabaseManager
-from .services.zhipin_api import zhipin_api # 导入新的API管理器
+from .services.zhipin_api import zhipin_api # 导入zhipin_api实例
 
 # --- 日志配置 (保持不变) ---
 LOGGING_CONFIG = {
@@ -64,7 +64,6 @@ async def main():
 
     # 1. 初始化所有模块
     logger.info("开始初始化所有模块...")
-    await zhipin_api.initialize() # 初始化API管理器并订阅事件
     db_manager = DatabaseManager(config.database.filename)
     browser_manager = BrowserManager(config, stop_flag)
     job_filter = JobFilter(config)
@@ -72,12 +71,18 @@ async def main():
     ws_client = WsClient(config, stop_flag)
     logger.info("所有模块初始化完成")
 
-    # 2. 注册事件订阅者
+    # 2. 注册事件订阅者 (新的事件流)
     logger.info("开始注册事件订阅者...")
     
-    # 浏览器发现职位列表后，进行前置筛选和初始入库
-    event_manager.subscribe("job_list_found", job_filter.pre_filter_jobs)
-    event_manager.subscribe("job_list_found", db_manager.save_initial_jobs)
+    # BrowserManager定时发布的会话更新事件，由ZhipinApi处理
+    event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
+    
+    # 浏览器发现职位列表后，获取完整的职位详情
+    event_manager.subscribe("job_list_found", job_analyzer.fetch_job_details)
+
+    # 获取到完整职位详情后，进行前置筛选和初始入库
+    event_manager.subscribe("job_details_fetched", job_filter.pre_filter_jobs)
+    event_manager.subscribe("job_details_fetched", db_manager.save_initial_jobs)
 
     # 前置筛选完成后，进行AI分析
     event_manager.subscribe("jobs_pre_filtered", job_analyzer.process_job_list)
@@ -98,7 +103,7 @@ async def main():
     event_manager.subscribe("shutdown", ws_client.close)
     event_manager.subscribe("shutdown", job_filter.close)
     event_manager.subscribe("shutdown", job_analyzer.close)
-    event_manager.subscribe("shutdown", zhipin_api.close) # 新增：关闭API管理器的会话
+    event_manager.subscribe("shutdown", zhipin_api.close)
     logger.info("事件订阅者注册完成")
 
     try:

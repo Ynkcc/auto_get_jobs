@@ -17,73 +17,77 @@ class JobFilter:
 
     async def pre_filter_jobs(self, jobs: list, **kwargs):
         """
-        事件订阅函数：前置岗位筛选
-        在AI分析前进行基础筛选，如薪资、工作描述关键字、公司名称等
+        事件订阅函数：前置岗位筛选 (基于完整职位信息)
         """
         logger.info(f"JobFilter 开始前置筛选 {len(jobs)} 个职位")
         
-        # 1. 使用从 general.py 导入的函数进行薪资过滤
-        salary_filtered_jobs = filter_jobs_by_salary(jobs, self.min_salary, self.max_salary)
+        # 1. 薪资过滤
+        # 提取 jobInfo 部分用于薪资过滤函数
+        job_infos_for_salary_check = [j.get('jobInfo', {}) for j in jobs]
+        # 注意：filter_jobs_by_salary返回的是jobInfo的列表
+        filtered_job_infos = filter_jobs_by_salary(job_infos_for_salary_check, self.min_salary, self.max_salary)
+        
+        # 将过滤后的jobInfo的ID集合起来，方便从原始jobs列表中找回完整的job对象
+        filtered_job_ids = {info.get('encryptId') for info in filtered_job_infos}
+        salary_filtered_jobs = [job for job in jobs if job.get('jobInfo', {}).get('encryptId') in filtered_job_ids]
+
         if len(jobs) != len(salary_filtered_jobs):
             logger.info(f"薪资过滤后剩余 {len(salary_filtered_jobs)} 个职位")
 
         final_filtered_jobs = []
         for job in salary_filtered_jobs:
-            job_card = job.get('jobCard', {})
+            job_info = job.get('jobInfo', {})
+            brand_info = job.get('brandComInfo', {})
 
-            # 2. 公司名称过滤（排除外包公司等）
-            if not self._check_company_name(job_card):
-                logger.debug(f"公司 {job_card.get('brandName')} 在排除列表中，已过滤")
+            # 2. 公司名称过滤
+            if not self._check_company_name(brand_info):
+                logger.debug(f"公司 {brand_info.get('brandName')} 在排除列表中，已过滤")
                 continue
 
-            # 3. 工作描述关键字过滤 (可按需实现)
-            if not self._check_job_description(job):
-                logger.debug(f"职位 {job_card.get('jobName')} 描述不符合要求，已过滤")
+            # 3. 工作描述关键字过滤
+            if not self._check_job_description(job_info):
+                logger.debug(f"职位 {job_info.get('jobName')} 描述不符合要求，已过滤")
                 continue
 
-            # 4. 检查是否已访问过
-            # 注意: 此处检查数据库中是否存在，JobAnalyzer中会做更严格的内存去重
-            if self.job_check_config.check_visited and self._is_job_visited(job_card):
-                logger.debug(f"职位 {job_card.get('jobName')} 已在数据库中存在，已过滤")
+            # 4. 检查是否已在数据库中存在（已投递或已分析过）
+            if self.job_check_config.check_visited and self._is_job_visited(job_info):
+                logger.debug(f"职位 {job_info.get('jobName')} 已在数据库中存在，已过滤")
                 continue
 
             final_filtered_jobs.append(job)
 
         logger.info(f"前置筛选完成，{len(jobs)} -> {len(final_filtered_jobs)} 个职位通过筛选")
 
-        # 发布筛选后的职位列表
         if final_filtered_jobs:
             await event_manager.publish("jobs_pre_filtered", jobs=final_filtered_jobs)
 
-    def _check_company_name(self, job_card: dict) -> bool:
+    def _check_company_name(self, brand_info: dict) -> bool:
         """检查公司名称是否在排除列表中"""
-        # 如果未在配置文件中启用该功能，则直接通过
         if not self.job_check_config.exclude_keywords or not self.job_check_config.exclude_keywords.company_name:
             return True
 
-        company_name = job_card.get('brandName', '').lower()
+        company_name = brand_info.get('brandName', '').lower()
         for keyword in self.job_check_config.exclude_keywords.company_name:
             if keyword.lower() in company_name:
                 return False
         return True
 
-    def _check_job_description(self, job: dict) -> bool:
+    def _check_job_description(self, job_info: dict) -> bool:
         """检查工作描述是否包含必需/排除的关键字"""
-        # 此处为扩展功能，可以根据配置添加更复杂的描述筛选逻辑
-        # 示例:
-        # job_card = job.get('jobCard', {})
-        # description = job_card.get('postDescription', '').lower()
-        # for keyword in self.job_check_config.exclude_keywords.job_description:
-        #     if keyword.lower() in description:
-        #         return False
+        if not self.job_check_config.exclude_keywords or not self.job_check_config.exclude_keywords.job_description:
+            return True
+        
+        description = job_info.get('postDescription', '').lower()
+        for keyword in self.job_check_config.exclude_keywords.job_description:
+            if keyword.lower() in description:
+                return False
         return True
 
-    def _is_job_visited(self, job_card: dict) -> bool:
+    def _is_job_visited(self, job_info: dict) -> bool:
         """检查职位是否已经存在于数据库中"""
-        encrypt_job_id = job_card.get('encryptJobId')
+        encrypt_job_id = job_info.get('encryptId')
         if not encrypt_job_id:
             return False
-        # check_jobs_exist 需要一个列表作为参数
         return bool(self.db_manager.check_jobs_exist([encrypt_job_id]))
 
     async def close(self, **kwargs):

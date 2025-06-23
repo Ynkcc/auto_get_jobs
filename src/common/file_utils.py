@@ -155,10 +155,9 @@ def filter_jobs_by_salary(jobs: List[Dict], min_expected_salary: float, max_expe
     jobs_matching_salary = []
 
     for job in jobs:
-        # 在重构后的架构中，job 是一个包含 jobCard 的字典
-        job_card = job.get('jobCard', {})
-        job_name = job_card.get('jobName', '未知职位')
-        job_salary = job_card.get('salaryDesc', '')
+        # 移除了job_card的提取，因为新的job结构是扁平的
+        job_name = job.get('jobName', '未知职位')
+        job_salary = job.get('salaryDesc', '')
         if not job_salary:
             continue
 
