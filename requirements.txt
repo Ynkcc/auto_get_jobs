@@ -12,3 +12,4 @@ protobuf
 requests_toolbelt
 playwright
 pydantic
+httpx[socks]

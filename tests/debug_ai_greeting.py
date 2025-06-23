@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.utils.ai_analyzer import AiAnalyzer
 from src.utils.config_manager import ConfigManager
 

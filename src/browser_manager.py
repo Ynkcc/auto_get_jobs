@@ -1,0 +1,219 @@
+# src/browser_manager.py
+import asyncio
+import logging
+import random
+import json
+import os
+from playwright.async_api import async_playwright, Response, Page
+from typing import List, Dict
+
+from .common.event_manager import event_manager
+from .common.rate_limiter import AsyncTokenBucket
+from .common.file_utils import build_search_url
+
+logger = logging.getLogger(__name__)
+
+class BrowserManager:
+    def __init__(self, config, stop_flag):
+        self.p_config = config.crawler.playwright
+        self.accounts_config = config.accounts[0] if config.accounts else None
+        self.job_search_config = config.job_search
+        self.rate_limit_config = config.crawler.rate_limit
+        
+        self.stop_flag = stop_flag
+        self.page = None
+        self.playwright = None
+        self.browser = None
+        self.save_task = None
+
+        self.token_bucket = AsyncTokenBucket(
+            rate=self.rate_limit_config['rate'],
+            capacity=self.rate_limit_config['capacity']
+        )
+        logger.info(
+            f"令牌桶限速器已初始化：速率 {self.rate_limit_config['rate']} req/s, "
+            f"容量 {self.rate_limit_config['capacity']}"
+        )
+
+    async def _handle_response(self, response: Response):
+        """监听职位列表API响应，并发布会话更新事件"""
+        if "wapi/zpgeek/search/joblist.json" in response.url:
+            logger.debug(f"监听到职位列表API响应: {response.url}")
+            try:
+                data = await response.json()
+                if data.get("code") == 0 and "zpData" in data:
+                    job_list = data["zpData"].get("jobList", [])
+                    if not job_list:
+                        logger.warning("本次API响应中职位列表为空")
+                        return
+                    
+                    cookies = await self.page.context.cookies()
+                    headers = {
+                        'User-Agent': await self.page.evaluate('() => navigator.userAgent'),
+                    }
+                    
+                    # 发布cookies更新事件，供zhipin_api等模块使用
+                    await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
+                    
+                    # 发布职位列表事件
+                    await event_manager.publish("job_list_found", jobs=job_list)
+                else:
+                    logger.error(f"接口响应数据格式错误: {data}")
+            except Exception as e:
+                logger.error(f"处理职位列表响应时发生异常: {e}", exc_info=True)
+
+    async def _load_login_data(self) -> bool:
+        """从文件加载登录数据（cookies）"""
+        # 使用 account.login_data_file 替代硬编码路径
+        login_file = self.accounts_config.login_data_file if self.accounts_config else None
+        if not login_file or not os.path.exists(login_file):
+            logger.warning("登录数据文件不存在或未配置，将进行扫码登录")
+            return False
+        
+        try:
+            with open(login_file, "r", encoding="utf-8") as f:
+                login_data = json.load(f)
+
+            await self.page.context.clear_cookies()
+            if login_data.get("cookies"):
+                await self.page.context.add_cookies(login_data["cookies"])
+
+            await self.page.goto("https://www.zhipin.com/web/user/?ka=header-login", wait_until='domcontentloaded')
+            await self.page.wait_for_timeout(2000)
+            
+            if await self.page.locator('a[ka="header-username"]').count() > 0:
+                logger.info("通过加载登录数据成功登录")
+                return True
+            else:
+                logger.warning("加载的登录数据已失效，请重新扫码登录")
+                return False
+        except Exception as e:
+            logger.error(f"加载登录数据失败: {e}", exc_info=True)
+            return False
+
+    async def _save_login_data(self):
+        """保存当前登录数据（cookies）到文件"""
+        login_file = self.accounts_config.login_data_file if self.accounts_config else None
+        if not login_file:
+            return False
+        try:
+            directory = os.path.dirname(login_file)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+
+            cookies = await self.page.context.cookies()
+            login_data = { "cookies": cookies }
+
+            with open(login_file, "w", encoding="utf-8") as f:
+                json.dump(login_data, f, indent=2, ensure_ascii=False)
+            
+            logger.debug("登录数据已保存")
+            return True
+        except Exception as e:
+            logger.error(f"保存登录数据失败: {e}", exc_info=True)
+            return False
+    
+    async def _start_autosave_timer(self, interval=60):
+        """启动定时保存登录数据的任务"""
+        logger.info(f"自动保存登录数据任务已启动，间隔: {interval}秒")
+        
+        async def saver():
+            while not self.stop_flag.is_set():
+                await self._save_login_data()
+                # 保存后，也发布一次会话更新事件
+                cookies = await self.page.context.cookies()
+                headers = {'User-Agent': await self.page.evaluate('() => navigator.userAgent')}
+                await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
+                await asyncio.sleep(interval)
+
+        self.save_task = asyncio.create_task(saver())
+
+    async def _stop_autosave_timer(self):
+        """停止定时保存任务"""
+        if self.save_task and not self.save_task.done():
+            self.save_task.cancel()
+            try:
+                await self.save_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("自动保存任务已停止")
+
+    async def _login(self):
+        """执行登录流程，优先加载本地数据，失败则扫码"""
+        if await self._load_login_data():
+            return True
+        
+        logger.info("请在浏览器中扫码登录...")
+        await self.page.goto("https://www.zhipin.com/web/user/?ka=header-login", wait_until='domcontentloaded')
+        try:
+            await self.page.locator('a[ka="header-username"]').wait_for(timeout=200000)
+            logger.info("扫码登录成功")
+            await self._save_login_data()
+            return True
+        except asyncio.TimeoutError:
+            logger.error("登录超时（200秒），请重新运行程序", exc_info=True)
+            return False
+        except Exception as e:
+            logger.error(f"登录过程中发生未知错误: {e}", exc_info=True)
+            return False
+
+    async def start(self):
+        """启动浏览器管理器，包括初始化、登录和开始爬取"""
+        if not self.accounts_config:
+            logger.error("未配置任何账号信息，BrowserManager无法启动。")
+            self.stop_flag.set()
+            return
+            
+        try:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(headless=self.p_config.headless)
+            context = await self.browser.new_context()
+            self.page = await context.new_page()
+
+            if not await self._login():
+                self.stop_flag.set()
+                return
+
+            await self._start_autosave_timer()
+            self.page.on("response", self._handle_response)
+            
+            url_list = build_search_url(self.job_search_config)
+            logger.info(f"共生成 {len(url_list)} 个搜索URL")
+
+            for url in url_list:
+                if self.stop_flag.is_set():
+                    logger.info("接收到停止信号，停止爬取新页面")
+                    break
+
+                await self.token_bucket.acquire(1)
+                logger.info(f"令牌获取成功，正在导航至: {url}")
+                await self.page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                
+                for i in range(self.p_config.scroll_pages):
+                    if self.stop_flag.is_set():
+                        break
+                    logger.info(f"正在进行第 {i+1}/{self.p_config.scroll_pages} 次滚动加载...")
+                    await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                    await asyncio.sleep(random.uniform(3, 5))
+
+            logger.info("所有搜索URL已处理完毕。")
+
+        except Exception as e:
+            logger.error(f"BrowserManager启动或运行过程中发生严重错误: {e}", exc_info=True)
+        finally:
+            self.stop_flag.set()
+
+    async def close(self, **kwargs):
+        """关闭浏览器和相关资源"""
+        logger.info("正在关闭浏览器...")
+        await self._stop_autosave_timer()
+        try:
+            if self.page and not self.page.is_closed():
+                self.page.remove_listener("response", self._handle_response)
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception as e:
+            logger.error(f"关闭浏览器时发生错误: {e}", exc_info=True)
+        logger.info("浏览器已成功关闭")

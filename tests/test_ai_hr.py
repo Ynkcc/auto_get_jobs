@@ -1,16 +1,16 @@
 import sys
 import os
 # 将父目录添加到模块搜索路径
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import json
-from utils_async import *
-from utils import *
-import yaml
 import asyncio
+from src.utils.config_manager import ConfigManager
+from src.utils.ai_analyzer import AiAnalyzer
 
-config=load_config("config.yaml")
-ai=AIAnalyzer(config["ai"])
+# 加载配置
+ConfigManager.load_config("config/config.yaml")
+config = ConfigManager.get_config()
+ai = AiAnalyzer()
 
 async def main():
     job_requirements = """职位名称：测试\n岗位职责：1、负责产品软件系统版本管理以及构建、发布和升级； 
@@ -31,7 +31,7 @@ async def main():
 7、对docker, k8s熟悉, 有3年以上生产环境k8s集群管理和优化经验； 
 8、对微服务有相关实践经验，能够熟练使用springboot框架，对springcloud相关组件有一定了解，熟悉常用的数据库比如MySQL，人大金仓等，对常用中间件redis、ActiveMq等有一定场景使用经验，能够高效设计和实现系统后端服务，了解docker和K8s等分布式架构知识，熟悉Linux常用命令，能够基于云平台进行系统问题定位和处理。
     """
-    result=await ai.aiHrCheck(job_requirements)
+    result = await ai.ai_hr_check(job_requirements)
     print(result)
 
 asyncio.run(main())

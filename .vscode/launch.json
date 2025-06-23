@@ -5,12 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python 调试程序: 当前文件",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": false  // 👈 添加这一行
+            "name": "Python: Debug src.main", // 调试配置的名称，会显示在VS Code的调试侧边栏
+            "type": "debugpy", // 调试器类型，这里是python
+            "request": "launch", // 请求类型，launch表示启动一个新的进程进行调试
+            "module": "src.main", // 使用 -m 方式启动，这里指定模块名
+            "console": "integratedTerminal", // 调试时使用的控制台，integratedTerminal表示使用VS Code的集成终端
+            "justMyCode": true, // 只调试用户编写的代码，跳过系统库和第三方库的代码
+            // "python": "/path/to/your/conda/envs/base/bin/python" // 【可选】如果VS Code没有自动识别Conda环境，请取消此行的注释，并替换为你的Conda base环境中Python解释器的绝对路径
         }
     ]
 }
