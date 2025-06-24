@@ -1,173 +1,244 @@
 # test_ws_client.py
 import asyncio
-import signal
 import logging
-import logging.config
-
-# --- 核心模块导入 ---
-# 确保你的项目结构能让此脚本找到 src 目录
-# 如果在根目录运行，可以使用下面的方式，否则请调整 sys.path
-import sys
+import json
 import os
+
+# 确保脚本可以从根目录找到src模块
+import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
+from src.services.ws_client.client import WsClient
 from src.common.config_manager import ConfigManager
 from src.common.event_manager import event_manager
-from src.browser_manager import BrowserManager
-from src.services.ws_client.client import WsClient
 from src.services.zhipin_api import zhipin_api
 
-# --- 日志配置 (使用详细的 DEBUG 级别以便于诊断) ---
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-    },
-    'handlers': {
-        'default': {
-            'level': 'DEBUG',  # 设置为 DEBUG
-            'formatter': 'standard',
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        '': {
-            'handlers': ['default'],
-            'level': 'DEBUG',
-            'propagate': False
-        }
-    }
-}
-logging.config.dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger("WsClientTester")
+# --- 1. 基本配置 ---
+# 配置日志，方便观察过程
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+# 屏蔽一些第三方库的冗余日志
+logging.getLogger('websockets').setLevel(logging.WARNING)
+logging.getLogger('paho').setLevel(logging.WARNING)
+logger = logging.getLogger("WS_CLIENT_TEST")
 
-# --- 全局停止标志 ---
-stop_flag = asyncio.Event()
+# --- 2. 准备测试数据 ---
+# !!! 警告: 请务必在运行前替换下方所有 "xxxxxxxx" 为一个真实、有效且未投递过的岗位ID信息。
+# 你可以通过浏览器开发者工具抓取API请求来获取这些ID。
+FIXED_JOB_DATA_JSON = '''
+{
 
-def signal_handler(sig, frame):
-    """处理 Ctrl+C 信号"""
-    logger.info(f"接收到停止信号 {sig}, 正在准备关闭...")
-    if not stop_flag.is_set():
-        stop_flag.set()
-
-async def application_success_handler(job_data: dict, **kwargs):
-    """投递成功后的回调，用于确认流程走完"""
-    job_name = job_data.get("jobInfo", {}).get("jobName", "未知职位")
-    logger.info(f"🎉🎉🎉 投递流程已成功完成，目标职位: {job_name} 🎉🎉🎉")
-    # 等待一会后自动停止测试
-    await asyncio.sleep(5)
-    stop_flag.set()
-
-# --- 测试核心逻辑 ---
-async def main():
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    # 1. 初始化配置
-    logger.info("初始化配置管理器...")
-    ConfigManager.load_config()
-    config = ConfigManager.get_config()
-    zhipin_api.reinitialize_config()
-
-    # 2. 定义你要投递的固定岗位信息
-    # !! 重要: 请替换下面的所有 "xxxx" 值为真实数据 !!
-    # 如何获取?
-    #   - 打开浏览器开发者工具 (F12)
-    #   - 访问一个职位详情页面
-    #   - 在网络(Network)面板中，筛选 "job/detail.json"，查看其响应(Response)
-    #   - `encryptJobId`, `lid`, `securityId` 等信息都在响应的 `zpData` 中。
-    #   - `encryptUserId` 在 `zpData.bossInfo.encryptUserId` 中。
-    test_job_data = {
+        "pageType": 0,
+        "selfAccess": false,
+        "securityId": "w1cYVBhAEjwQ4-M1U0ZI31PJeHliYk9NGM54WJIOHpDhrbgONbJ1HHuyT2ykwVS_PmGctrpFqhrZE3-aajdmYco03iZGygRSpePRNxyhi4dN33uYQd24Z2GgaoY0hrx2neN50335wZPq9DlCZX1R29SN2NFX_A~~",
+        "sessionId": null,
+        "lid": "4C2BUgdCrka.search.4",
         "jobInfo": {
-            "encryptId": "在此处替换为真实岗位的 encryptJobId",  # 例如: "1b2c3d4e5f..."
-            "jobName": "后端开发工程师 (测试专用)",
-            "salaryDesc": "20-40K",
-            # ... 其他 jobInfo 字段 (可选)
+            "encryptId": "df22f9b990ba49f81Hx_3Nq4EVpZ",
+            "encryptUserId": "89b9fc4097c345460XN82tW5F1RU",
+            "invalidStatus": false,
+            "jobName": "IT技术支持",
+            "position": 100405,
+            "positionName": "IT技术支持",
+            "location": 101310100,
+            "locationName": "海口",
+            "experienceName": "1-3年",
+            "degreeName": "大专",
+            "jobType": 0,
+            "proxyJob": 0,
+            "proxyType": 0,
+            "salaryDesc": "5-10K",
+            "payTypeDesc": null,
+            "postDescription": "工作内容\\n1、为企业内部用户提供专业的IT技术支持与服务。\\n2、参与售前与售后技术支持活动，确保技术问题得到有效解决。\\n3、与团队合作，共同维护和优化IT系统。\\n\\n任职要求\\n1、具备扎实的IT技术支持背景，能够独立处理技术难题。\\n2、熟悉计算机或通信领域的技术标准和操作流程。\\n3、具有良好的团队合作精神和客户服务意识。",
+            "encryptAddressId": "4b402f397614f6d71nZ80ty-GVpTw4-5VPuc",
+            "address": "海口龙华区海口市新华信息产业孵化园(新华南路)5层",
+            "longitude": 110.344014,
+            "latitude": 20.03833,
+            "staticMapUrl": "https://img.bosszhipin.com/beijin/upload/amap_proxy/20231018/48ba41acc9cef1bf5789e45458daa1285cddf899145be7b86bb61e3b7bce0931da574d19d1d82c88.png.webp",
+            "pcStaticMapUrl": "https://img.bosszhipin.com/beijin/upload/amap_proxy/20240511/48ba41acc9cef1bf053dc1dd79ba449ab369ba22d30fadfa6bb61e3b7bce0931da574d19d1d82c88.png.webp",
+            "baiduStaticMapUrl": "",
+            "baiduPcStaticMapUrl": "",
+            "overseasAddressList": [],
+            "overseasInfo": null,
+            "showSkills": [
+                "企业内部IT技术支持",
+                "IT技术支持经验",
+                "售前/售后技术支持",
+                "计算机/通信相关专业"
+            ],
+            "anonymous": 0,
+            "jobStatusDesc": "招聘中"
         },
         "bossInfo": {
-            "encryptUserId": "在此处替换为真实 Boss 的 encryptUserId", # 例如: "6a7b8c9d0e..."
-            # ... 其他 bossInfo 字段 (可选)
+            "name": "冯先生",
+            "title": "招聘者",
+            "tiny": "https://img.bosszhipin.com/boss/avatar/avatar_6.png",
+            "large": "https://img.bosszhipin.com/boss/avatar/avatar_6.png",
+            "activeTimeDesc": "4月内活跃",
+            "bossOnline": false,
+            "brandName": "小贝科技",
+            "bossSource": 0,
+            "certificated": true,
+            "tagIconUrl": null,
+            "avatarStickerUrl": null
         },
         "brandComInfo": {
-            "brandName": "未来无限科技 (测试公司)",
-            # ... 其他 brandComInfo 字段 (可选)
+            "encryptBrandId": "bd103f6e30af5c721HN40tW6EVc~",
+            "brandName": "小贝科技",
+            "logo": "https://img.bosszhipin.com/beijin/icon/894ce6fa7e58d64d57e7f22d2f3a9d18afa7fcceaa24b8ea28f56f1bb14732c0.png",
+            "stage": 0,
+            "stageName": "",
+            "scale": 302,
+            "scaleName": "20-99人",
+            "industry": 100020,
+            "industryName": "互联网",
+            "introduce": "",
+            "labels": [],
+            "activeTime": 1748198086909,
+            "visibleBrandInfo": true,
+            "focusBrand": false,
+            "customerBrandName": "小贝科技",
+            "customerBrandStageName": ""
         },
-        "lid": "在此处替换为真实岗位的 lid", # 例如: "k9j8h7g6f5..."
-        "securityId": "在此处替换为真实岗位的 securityId" # 例如: "abcdefg-hijklmn-opqrst-uvwxyz123"
+        "oneKeyResumeInfo": {
+            "inviteType": 0,
+            "alreadySend": false,
+            "canSendResume": false,
+            "canSendPhone": false,
+            "canSendWechat": false
+        },
+        "relationInfo": {
+            "interestJob": false,
+            "beFriend": false
+        },
+        "handicappedInfo": null,
+        "appendixInfo": {
+            "canFeedback": false,
+            "chatBubble": null
+        },
+        "atsOnlineApplyInfo": {
+            "inviteType": 0,
+            "alreadyApply": false
+        },
+        "certMaterials": []
     }
 
-    # # 检查占位符是否已被替换
-    # if "在此处替换" in str(test_job_data):
-    #     logger.error("请先在脚本中替换 `test_job_data` 的占位符信息！")
-    #     return
+'''
+FIXED_JOB_DATA= json.loads(FIXED_JOB_DATA_JSON, strict=False)
 
-    # 3. 初始化核心模块
-    logger.info("初始化浏览器、API客户端和WsClient...")
-    browser_manager = BrowserManager(config, stop_flag)
+# 指定包含cookies的账号文件
+ACCOUNT_FILE = 'data/account1.json'
+
+
+async def run_test():
+    """执行完整的投递测试流程"""
+    logger.info("="*20 + " WebSocket客户端投递测试 " + "="*20)
+    
+    # --- 3. 初始化环境 ---
+    try:
+        ConfigManager.load_config('config/config.yaml')
+        config = ConfigManager.get_config()
+        zhipin_api.reinitialize_config()
+        logger.info("配置加载成功。")
+    except Exception as e:
+        logger.error(f"加载配置 'config/config.yaml' 失败: {e}")
+        return
+
+    # 创建停止标志和WsClient实例
+    stop_flag = asyncio.Event()
     ws_client = WsClient(config, stop_flag)
 
-    # 4. 注册测试所需的事件
-    logger.info("注册事件订阅...")
-    # a. 会话同步: Browser -> ZhipinApi
-    event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
-    # b. 沟通与投递: TestScript -> WsClient
-    event_manager.subscribe("add_friend", ws_client.handle_add_friend)
-    event_manager.subscribe("apply_to_job", ws_client.handle_application)
-    # c. 投递成功确认: WsClient -> TestScript
-    event_manager.subscribe("application_sent_successfully", application_success_handler)
-    # d. 优雅关闭
-    event_manager.subscribe("shutdown", browser_manager.close)
-    event_manager.subscribe("shutdown", zhipin_api.close)
-    event_manager.subscribe("shutdown", ws_client.close)
-    logger.info("事件订阅完成")
-
+    # 模拟BrowserManager，从文件加载cookies并初始化ZhipinApi
     try:
-        # 5. 启动核心任务
-        logger.info("启动浏览器进行登录...")
-        browser_task = asyncio.create_task(browser_manager.start())
+        with open(ACCOUNT_FILE, 'r', encoding='utf-8') as f:
+            account_data = json.load(f)
+        if "headers" not in account_data:
+            account_data["headers"] = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+            }
+        # 发布事件，让ZhipinApi更新会话并进入就绪状态
+        await event_manager.publish("cookies_updated", cookies_data=account_data)
+        logger.info(f"已从 '{ACCOUNT_FILE}' 加载账号信息并初始化API。")
+    except FileNotFoundError:
+        logger.error(f"账号文件未找到: '{ACCOUNT_FILE}'。测试无法继续。")
+        return
+    except Exception as e:
+        logger.error(f"初始化API会话失败: {e}", exc_info=True)
+        return
+
+    # 启动 WsClient 的主循环任务
+    ws_task = asyncio.create_task(ws_client.run())
+
+    # --- 4. 执行测试 ---
+    logger.info("正在等待WsClient连接服务器... (最长等待15秒)")
+    # 等待 WsClient 内部的 is_connected 标志位变为 True
+    for _ in range(15):
+        if ws_client.is_connected:
+            break
+        await asyncio.sleep(1)
+    
+    if not ws_client.is_connected:
+        logger.error("WsClient未能连接，测试终止。请检查网络、账号凭据或WsClient的实现。")
+    else:
+        logger.info("WsClient已成功连接服务器。现在模拟发起一次投递。")
         
-        logger.info("等待 ZhipinApi 会话就绪...")
-        await zhipin_api.wait_for_ready()
-        logger.info("ZhipinApi 已就绪! 启动 WsClient...")
+        # --- 修改开始: 订阅核心投递流程事件 ---
+        # 订阅 'add_friend' 事件，由 ws_client.handle_add_friend 处理，它会调用API发起沟通
+        event_manager.subscribe("add_friend", ws_client.handle_add_friend)
+        # 订阅 'apply_to_job' 事件，由 ws_client.handle_application 处理，它会在沟通成功后发送问候语
+        event_manager.subscribe("apply_to_job", ws_client.handle_application)
+        # --- 修改结束 ---
 
-        ws_task = asyncio.create_task(ws_client.run())
-        
-        # 6. 等待 WsClient 连接成功
-        while not ws_client.is_connected:
-            if stop_flag.is_set():
-                logger.warning("在WsClient连接前收到停止信号，测试终止")
-                return
-            logger.info("等待 WsClient 连接...")
-            await asyncio.sleep(1)
-        
-        logger.info("✅ WsClient 已成功连接! 准备开始投递测试...")
-        await asyncio.sleep(2) # 等待一下，确保稳定
+        # 为了验证完整流程，我们监听最终的成功事件
+        application_confirmed = asyncio.Event()
+        async def confirm_application_sent(job_data, **kwargs):
+            logger.info("***** 流程确认: 收到 'application_sent_successfully' 事件! *****")
+            application_confirmed.set()
 
-        # 7. 发布 `add_friend` 事件，启动投递流程
-        logger.info(f"发布 'add_friend' 事件，目标职位: {test_job_data['jobInfo']['jobName']}")
-        await event_manager.publish("add_friend", job_data=test_job_data)
+        event_manager.subscribe("application_sent_successfully", confirm_application_sent)
 
-        # 8. 等待测试完成或被手动停止
-        logger.info("投递流程已启动，等待其完成或手动按 Ctrl+C 停止...")
-        await stop_flag.wait()
+        # 发布 "add_friend" 事件，这是整个投递流程的起点
+        logger.info(f"发布 'add_friend' 事件，目标职位: {FIXED_JOB_DATA.get('jobInfo', {}).get('jobName')}")
+        await event_manager.publish("add_friend", job_data=FIXED_JOB_DATA)
 
-    except asyncio.CancelledError:
-        logger.info("主任务被取消")
-    finally:
-        logger.info("正在关闭所有服务...")
-        # 确保即使浏览器任务提前结束，也能触发关闭流程
-        if not stop_flag.is_set():
-            stop_flag.set()
-        await event_manager.publish("shutdown")
-        # 等待所有异步的 close 方法执行完毕
-        await asyncio.sleep(3)
-        logger.info("测试脚本已优雅退出")
+        # 等待最终确认事件，或超时
+        try:
+            await asyncio.wait_for(application_confirmed.wait(), timeout=30.0)
+            logger.info("【测试成功】: 在30秒内确认投递流程已执行完毕。")
+        except asyncio.TimeoutError:
+            logger.error("【测试失败】: 30秒内未收到投递成功确认事件。")
+            logger.error("诊断建议: ")
+            logger.error("1. 检查 'zhipin_api.start_chat' 是否成功 (如果失败，不会有后续事件)。")
+            logger.error("2. 检查 'ws_client.handle_application' 是否被触发。")
+            logger.error("3. 检查 'ws_client._send_greeting_message' 中的消息发送逻辑。")
 
-if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("检测到Ctrl+C，程序退出")
+    # --- 5. 清理资源 ---
+    logger.info("测试结束，正在关闭所有资源...")
+    stop_flag.set()
+    await asyncio.sleep(2)  # 等待任务响应停止信号
+    await ws_client.close()
+    await zhipin_api.close()
+    if ws_task:
+        ws_task.cancel()
+        try:
+            await ws_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("测试脚本执行完毕。")
+
+
+if __name__ == "__main__":
+    if 'xxxxxxxx' in FIXED_JOB_DATA['securityId']:
+        print("="*60)
+        print("【运行前必读】")
+        print("请打开 `test_ws_client.py` 文件, 修改 `FIXED_JOB_DATA` 字典。")
+        print("将其中所有的 'xxxxxxxx' 替换为一个真实、有效且未投递过的岗位ID。")
+        print(f"同时，请确保有效的账号cookie文件 '{ACCOUNT_FILE}' 存在。")
+        print("="*60)
+    else:
+        try:
+            asyncio.run(run_test())
+        except KeyboardInterrupt:
+            logger.info("测试被手动中断。")

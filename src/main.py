@@ -113,14 +113,27 @@ async def main():
     try:
         # 3. 启动核心任务
         logger.info("启动核心服务...")
-        browser_task = asyncio.create_task(browser_manager.start())
         ws_task = asyncio.create_task(ws_client.run())
-        await stop_flag.wait()
+
+        # 启动浏览器并等待登录完成
+        login_successful = await browser_manager.login_and_setup()
+
+        # 仅在登录成功后启动爬取任务
+        if login_successful:
+            logger.info("登录成功，开始爬取职位...")
+            browser_task = asyncio.create_task(browser_manager.start_crawling())
+            await stop_flag.wait()
+        else:
+            logger.error("登录失败，程序即将退出。")
+            stop_flag.set() # 触发正常关闭流程
+            await asyncio.sleep(2) # 等待其他任务响应停止信号
         
     except asyncio.CancelledError:
         logger.info("主任务被取消")
     finally:
         logger.info("正在关闭所有服务...")
+        if not stop_flag.is_set():
+             stop_flag.set()
         await event_manager.publish("shutdown")
         await asyncio.sleep(3) 
         logger.info("程序已优雅退出")
