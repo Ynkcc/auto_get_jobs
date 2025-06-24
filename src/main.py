@@ -51,6 +51,10 @@ logger = logging.getLogger(__name__)
 # 初始化配置管理器
 ConfigManager.load_config()
 config = ConfigManager.get_config()
+
+# 重新初始化 ZhipinApi 配置
+zhipin_api.reinitialize_config()
+
 stop_flag = asyncio.Event()
 
 def signal_handler(sig, frame):
@@ -109,8 +113,8 @@ async def main():
     try:
         # 3. 启动核心任务
         logger.info("启动核心服务...")
-        ws_task = asyncio.create_task(ws_client.run())
         browser_task = asyncio.create_task(browser_manager.start())
+        ws_task = asyncio.create_task(ws_client.run())
         await stop_flag.wait()
         
     except asyncio.CancelledError:

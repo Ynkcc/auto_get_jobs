@@ -1,4 +1,5 @@
 # src/services/zhipin_api.py
+
 import asyncio
 import hashlib
 import logging
@@ -8,10 +9,10 @@ from typing import Dict, Optional
 
 import aiohttp
 from yarl import URL
-from aiolimiter import AsyncLimiter # 导入 aiolimiter
+from aiolimiter import AsyncLimiter
 
 from ..common.event_manager import event_manager
-from ..common.config_manager import ConfigManager # 导入 ConfigManager
+from ..common.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +27,27 @@ class ZhipinApi:
             cls._instance._cookies = {}
             cls._instance._user_info = {}
             cls._instance._session_lock = asyncio.Lock()
-            # 从配置初始化速率限制器
-            config = ConfigManager.get_config()
-            rate_limit_config = config.crawler.rate_limit
-            cls._instance._limiter = AsyncLimiter(rate_limit_config['rate'], 1)
-            logger.info(f"ZhipinApi 限速器已初始化: 速率 {rate_limit_config['rate']} req/s")
+            # 设置一个安全的默认限速器，防止在配置加载前调用时出错
+            cls._instance._limiter = AsyncLimiter(1, 1)
+            # API就绪状态事件
+            cls._instance._api_ready = asyncio.Event()
+            logger.info("ZhipinApi已创建，使用默认限速器 (1 req/s)")
         return cls._instance
+
+    async def wait_for_ready(self):
+        """
+        等待API客户端进入就绪状态。
+        """
+        await self._api_ready.wait()
 
     async def handle_session_update(self, cookies_data: dict, **kwargs):
         """
         事件回调：当收到新的登录凭据时，更新会话的 cookies 和 headers。
         """
         async with self._session_lock:
+            # 清除旧的就绪状态
+            self._api_ready.clear()
+            
             cookies = cookies_data.get("cookies", [])
             self._cookies = {c['name']: c['value'] for c in cookies}
             self._headers.update(cookies_data.get("headers", {}))
@@ -46,7 +56,14 @@ class ZhipinApi:
                 await self._session.close()
             self._session = None
             logger.info("ZhipinApi 的会话配置已更新，将在下次请求时重建")
-            await self.get_user_info()
+
+        # 尝试获取用户信息以验证新会话并设置就绪状态
+        user_info = await self.get_user_info(wait_for_ready=False)
+        if user_info:
+            self._api_ready.set()
+            logger.info("ZhipinApi 已就绪，凭据验证成功。")
+        else:
+            logger.warning("ZhipinApi 在会话更新后未能进入就绪状态。")
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """
@@ -74,10 +91,10 @@ class ZhipinApi:
         """
         获取职位详细信息
         """
+        await self._api_ready.wait()
         async with self._limiter:
             session = await self._get_session()
             url = "https://www.zhipin.com/wapi/zpgeek/job/detail.json"
-            # 使用时间戳作为参数"_"
             params = {
                 "securityId": security_id,
                 "lid": lid,
@@ -97,35 +114,45 @@ class ZhipinApi:
                 logger.error(f"请求职位详情时出错 (securityId: {security_id}): {e}", exc_info=True)
                 return None
 
-    async def get_user_info(self) -> Dict:
+    async def get_user_info(self, wait_for_ready: bool = True) -> Dict:
         """获取当前登录的用户信息并缓存"""
-        async with self._limiter:
-            session = await self._get_session()
-            if not self._cookies:
-                logger.warning("无法获取用户信息：Session中没有Cookies。")
-                return {}
-            try:
-                url = "https://www.zhipin.com/wapi/zpgeek/user/info"
-                async with session.get(url, timeout=10) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    if data.get("code") == 0 and "zpData" in data:
-                        self._user_info = data.get("zpData", {})
-                        logger.info(f"获取用户信息成功: {self._user_info.get('name')}")
-                        return self._user_info
-                    else:
-                        logger.error(f"获取用户信息失败: {data.get('message')}")
-                        return {}
-            except Exception as e:
-                logger.error(f"请求用户信息时出错: {e}", exc_info=True)
-                return {}
+        if wait_for_ready:
+            await self._api_ready.wait()
+            # 如果是等待后调用，直接返回缓存的信息
+            return self._user_info
+
+        # ---- 以下逻辑仅在初始化时(wait_for_ready=False)执行 ----
+        session = await self._get_session()
+        if not self._cookies:
+            logger.warning("无法获取用户信息：Session中没有Cookies。")
+            return {}
+        try:
+            url = "https://www.zhipin.com/wapi/zpuser/wap/getUserInfo.json"
+            async with session.get(url, timeout=10) as response:
+                response.raise_for_status()
+                data = await response.json()
+                if data.get("code") == 0 and "zpData" in data:
+                    self._user_info = data.get("zpData", {})
+                    logger.info(f"获取用户信息成功: {self._user_info.get('name')}")
+                    return self._user_info
+                else:
+                    logger.error(f"获取用户信息失败: {data.get('message')}")
+                    self._user_info = {} # 获取失败时清空
+                    return {}
+        except Exception as e:
+            logger.error(f"请求用户信息时出错: {e}", exc_info=True)
+            self._user_info = {} # 出现异常时清空
+            return {}
 
     def get_user_id(self) -> Optional[int]:
-        """从缓存的用户信息中获取UID"""
-        return self._user_info.get("uid")
+        """
+        从缓存的用户信息中获取用于mqtt连接的用户名。
+        """
+        return self._user_info.get("token")
 
     async def get_wt2(self) -> Optional[str]:
         """通过网络请求获取wt2验证参数"""
+        await self._api_ready.wait()
         async with self._limiter:
             session = await self._get_session()
             if not self._cookies:
@@ -151,6 +178,7 @@ class ZhipinApi:
         """
         上传图片简历到Boss直聘, 优先尝试快传.
         """
+        await self._api_ready.wait()
         async with self._limiter:
             session = await self._get_session()
             quick_upload_url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
@@ -195,6 +223,7 @@ class ZhipinApi:
 
     async def start_chat(self, security_id: str, job_id: str, lid: str) -> Optional[Dict]:
         """ 与招聘者开始聊天（投递简历）"""
+        await self._api_ready.wait()
         async with self._limiter:
             url = "https://www.zhipin.com/wapi/zpgeek/friend/add.json"
             params = {"securityId": security_id, "jobId": job_id, "lid": lid}
@@ -214,5 +243,15 @@ class ZhipinApi:
                 await self._session.close()
                 self._session = None
                 logger.info("ZhipinApi 的 aiohttp.ClientSession 已关闭")
+
+    def reinitialize_config(self):
+        """根据加载的配置重新初始化速率限制器。"""
+        try:
+            config = ConfigManager.get_config()
+            rate_limit_config = config.crawler.rate_limit
+            self._limiter = AsyncLimiter(rate_limit_config['rate'], 1)
+            logger.info(f"ZhipinApi 限速器已根据配置更新: 速率 {rate_limit_config['rate']} req/s")
+        except RuntimeError as e:
+            logger.warning(f"重新初始化ZhipinApi配置失败，将继续使用默认限速器: {e}")
 
 zhipin_api = ZhipinApi()

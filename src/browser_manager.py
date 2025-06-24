@@ -92,6 +92,17 @@ class BrowserManager:
             logger.error(f"保存登录数据失败: {e}", exc_info=True)
             return False
     
+    # 新增：用于发布会话数据的辅助方法
+    async def _publish_session_data(self):
+        """获取当前会话数据并发布事件以同步 ZhipinApi"""
+        try:
+            cookies = await self.page.context.cookies()
+            headers = {'User-Agent': await self.page.evaluate('() => navigator.userAgent')}
+            await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
+            logger.info("会话数据已发布，用于 ZhipinApi 同步")
+        except Exception as e:
+            logger.error(f"发布会话数据时出错: {e}", exc_info=True)
+
     async def _start_autosave_timer(self, interval=60):
         """启动定时保存登录数据并发布更新事件的任务"""
         logger.info(f"自动保存与会话更新任务已启动，间隔: {interval}秒")
@@ -99,10 +110,7 @@ class BrowserManager:
         async def saver():
             while not self.stop_flag.is_set():
                 await self._save_login_data()
-                
-                cookies = await self.page.context.cookies()
-                headers = {'User-Agent': await self.page.evaluate('() => navigator.userAgent')}
-                await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
+                await self._publish_session_data() # 使用新的辅助方法
                 
                 await asyncio.sleep(interval)
 
@@ -119,16 +127,20 @@ class BrowserManager:
             logger.info("自动保存任务已停止")
 
     async def _login(self):
-        """执行登录流程，优先加载本地数据，失败则扫码"""
+        """执行登录流程，并在成功后立即同步会话"""
+        # 场景一: 从文件加载登录数据成功
         if await self._load_login_data():
+            await self._publish_session_data() # 修改点: 立即发布会话数据
             return True
         
+        # 场景二: 进行扫码登录
         logger.info("请在浏览器中扫码登录...")
         await self.page.goto("https://www.zhipin.com/web/user/?ka=header-login", wait_until='domcontentloaded')
         try:
             await self.page.locator('a[ka="header-username"]').wait_for(timeout=200000)
             logger.info("扫码登录成功")
             await self._save_login_data()
+            await self._publish_session_data() # 修改点: 立即发布会话数据
             return True
         except asyncio.TimeoutError:
             logger.error("登录超时（200秒），请重新运行程序", exc_info=True)
