@@ -133,6 +133,20 @@ ACCOUNT_FILE = 'data/account1.json'
 
 
 async def run_test():
+
+
+    # 1. 初始化所有模块
+    logger.info("开始初始化所有模块...")
+
+    # 2. 注册事件订阅者 (新的事件流)
+    logger.info("开始注册事件订阅者...")
+    
+    # BrowserManager定时发布的会话更新事件，由ZhipinApi处理
+    event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
+
+
+    event_manager.subscribe("shutdown", zhipin_api.close)
+    logger.info("事件订阅者注册完成")
     """执行完整的投递测试流程"""
     logger.info("="*20 + " WebSocket客户端投递测试 " + "="*20)
     
@@ -149,7 +163,8 @@ async def run_test():
     # 创建停止标志和WsClient实例
     stop_flag = asyncio.Event()
     ws_client = WsClient(config, stop_flag)
-
+    # 订阅 cookies 更新事件，由 WsClient 处理
+    event_manager.subscribe("cookies_updated", ws_client._handle_cookies_updated)
     # 模拟BrowserManager，从文件加载cookies并初始化ZhipinApi
     try:
         with open(ACCOUNT_FILE, 'r', encoding='utf-8') as f:
@@ -201,7 +216,7 @@ async def run_test():
 
         # 发布 "add_friend" 事件，这是整个投递流程的起点
         logger.info(f"发布 'add_friend' 事件，目标职位: {FIXED_JOB_DATA.get('jobInfo', {}).get('jobName')}")
-        await event_manager.publish("add_friend", job_data=FIXED_JOB_DATA)
+        await event_manager.publish("add_friend", job_data=FIXED_JOB_DATA, greeting_message="你好，我对这个职位很感兴趣，希望能进一步了解。")
 
         # 等待最终确认事件，或超时
         try:

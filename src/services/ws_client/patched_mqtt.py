@@ -23,5 +23,5 @@ class patch_client(mqtt.Client):
             self._in_packet["packet"] = self._in_packet["packet"][:2]
             self._in_packet['remaining_count'] = [2]
             self._in_packet["remaining_length"] = 2
-        return super()._handle_pubackcomp()
+        return super()._handle_pubackcomp(*args, **kwargs)
     

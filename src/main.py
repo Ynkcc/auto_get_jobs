@@ -78,8 +78,9 @@ async def main():
     # 2. 注册事件订阅者 (新的事件流)
     logger.info("开始注册事件订阅者...")
     
-    # BrowserManager定时发布的会话更新事件，由ZhipinApi处理
+    # BrowserManager定时发布的会话更新事件，由ZhipinApi和WsClient处理
     event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
+    event_manager.subscribe("cookies_updated", ws_client._handle_cookies_updated)
     
     # 浏览器发现职位列表后，获取完整的职位详情
     event_manager.subscribe("job_list_found", job_analyzer.fetch_job_details)

@@ -100,8 +100,15 @@ class JobAnalyzer:
             await event_manager.publish("job_analysis_complete", analysis_data=analysis_data)
 
             if is_match:
-                logger.info(f"职位 '{job_name}' AI分析匹配成功，准备发起沟通")
-                await event_manager.publish("add_friend", job_data=job_data)
+                logger.info(f"职位 '{job_name}' AI分析匹配成功，准备生成打招呼语并发起沟通")
+                # 生成打招呼语
+                greeting = await self.ai_analyzer.ai_greeting(job_desc)
+                if not greeting:
+                    logger.warning(f"未能为职位 '{job_name}' 生成打招呼语，将使用默认。")
+                    # 如果需要，可以在这里设置一个默认打招呼语
+                
+                # 将打招呼语添加到数据中，并发布事件
+                await event_manager.publish("add_friend", job_data=job_data, greeting_message=greeting)
             else:
                 logger.info(f"职位 '{job_name}' AI分析不匹配")
         except Exception as e:

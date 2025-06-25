@@ -175,51 +175,89 @@ class ZhipinApi:
                 return None
 
     async def upload_image(self, file_path: str, security_id: str, file_md5: str) -> Optional[Dict]:
-        """
-        上传图片简历到Boss直聘, 优先尝试快传.
-        """
-        await self._api_ready.wait()
-        async with self._limiter:
-            session = await self._get_session()
-            quick_upload_url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
-            quick_data = {
-                "fileMd5": file_md5,
-                "fileSize": os.path.getsize(file_path),
-                "source": "chat_file",
-                "securityId": security_id
-            }
-            try:
-                async with session.post(quick_upload_url, data=quick_data, timeout=10) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data.get("code") == 0 and data.get("zpData", {}).get("url"):
-                            logger.info(f"图片 '{os.path.basename(file_path)}' 快速上传成功")
-                            return data.get("zpData")
-            except Exception as e:
-                logger.warning(f"快速上传失败，将尝试完整上传: {e}")
-        
-        async with self._limiter:
-            session = await self._get_session()
-            full_upload_url = "https://www.zhipin.com/wapi/zpupload/image/uploadSingle"
-            try:
-                with open(file_path, "rb") as f:
-                    form_data = aiohttp.FormData()
-                    form_data.add_field('file', f, filename=os.path.basename(file_path), content_type='application/octet-stream')
-                    form_data.add_field('securityId', security_id)
-                    form_data.add_field('source', 'chat_file')
-                    
-                    async with session.post(full_upload_url, data=form_data, timeout=30) as response:
-                        response.raise_for_status()
-                        data = await response.json()
-                        if data.get("code") == 0:
-                            logger.info(f"图片 '{os.path.basename(file_path)}' 完整上传成功")
-                            return data.get("zpData")
-                        else:
-                            logger.error(f"完整上传失败: {data.get('message')}")
-                            return None
-            except Exception as e:
-                logger.error(f"完整上传时发生错误: {e}", exc_info=True)
-                return None
+            """
+            上传图片简历到Boss直聘, 优先尝试快传, 并返回符合Protobuf结构的字典。
+            """
+            await self._api_ready.wait()
+
+            # 辅助函数，用于从API响应构建Protobuf兼容的字典
+            def _build_image_dict(zp_data: dict) -> Optional[Dict]:
+                if not zp_data or 'url' not in zp_data:
+                    return None
+                try:
+                    # 从元数据获取尺寸，如果不存在则提供默认值
+                    metadata = zp_data.get("metadata", {})
+                    origin_width = metadata.get("width",None)
+                    origin_height = metadata.get("height", None)
+                    if origin_width is None or origin_height is None:
+                        # 如果没有提供尺寸，引发异常
+                        raise ValueError("图片元数据中缺少宽度或高度信息")
+
+                    # 计算缩略图尺寸
+                    tiny_width = 200
+                    tiny_height = int(tiny_width * origin_height / origin_width) if origin_width > 0 else 200
+
+                    return {
+                        "tinyImage": {
+                            "url": zp_data.get('tinyUrl', zp_data['url']), # 如果没有tinyUrl，使用原始url
+                            "width": tiny_width,
+                            "height": tiny_height
+                        },
+                        "originImage": {
+                            "url": zp_data['url'],
+                            "width": origin_width,
+                            "height": origin_height
+                        }
+                    }
+                except Exception as e:
+                    logger.error(f"从zpData构建图片字典时出错: {e}")
+                    return None
+
+            # 1. 尝试快速上传
+            async with self._limiter:
+                session = await self._get_session()
+                quick_upload_url = "https://www.zhipin.com/wapi/zpupload/quicklyUpload"
+                quick_data = {
+                    "fileMd5": file_md5,
+                    "fileSize": os.path.getsize(file_path),
+                    "source": "chat_file",
+                    "securityId": security_id
+                }
+                try:
+                    async with session.post(quick_upload_url, data=quick_data, timeout=10) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            if data.get("code") == 0:
+                                zp_data = data.get("zpData")
+                                if zp_data and zp_data.get("url"):
+                                    logger.info(f"图片 '{os.path.basename(file_path)}' 快速上传成功")
+                                    return _build_image_dict(zp_data)
+                except Exception as e:
+                    logger.warning(f"快速上传失败，将尝试完整上传: {e}")
+            
+            # 2. 如果快传失败，则进行完整上传
+            async with self._limiter:
+                session = await self._get_session()
+                full_upload_url = "https://www.zhipin.com/wapi/zpupload/image/uploadSingle"
+                try:
+                    with open(file_path, "rb") as f:
+                        form_data = aiohttp.FormData()
+                        form_data.add_field('file', f, filename=os.path.basename(file_path), content_type='application/octet-stream')
+                        form_data.add_field('securityId', security_id)
+                        form_data.add_field('source', 'chat_file')
+                        
+                        async with session.post(full_upload_url, data=form_data, timeout=30) as response:
+                            response.raise_for_status()
+                            data = await response.json()
+                            if data.get("code") == 0:
+                                logger.info(f"图片 '{os.path.basename(file_path)}' 完整上传成功")
+                                return _build_image_dict(data.get("zpData"))
+                            else:
+                                logger.error(f"完整上传失败: {data.get('message')}")
+                                return None
+                except Exception as e:
+                    logger.error(f"完整上传时发生错误: {e}", exc_info=True)
+                    return None
 
     async def start_chat(self, security_id: str, job_id: str, lid: str) -> Optional[Dict]:
         """ 与招聘者开始聊天（投递简历）"""
