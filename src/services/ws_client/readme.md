@@ -86,7 +86,7 @@
 
 ### 4.3. 连接丢失问题 (`MQTT_ERR_CONN_LOST`)
 
-*   **问题:**  客户端偶现连接丢失问题，错误码为 `MQTT_ERR_CONN_LOST` (code 7)，怀疑与 Python GIL 导致连接超时有关。
+*   **问题:**  客户端偶现连接丢失问题，错误码为 `MQTT_ERR_CONN_LOST` (code 7)
 *   **尝试解决方案:**  修改 `paho-mqtt` 源码，将连接断开错误 (`MQTT_ERR_CONN_LOST`) 转换为非致命错误 (`MQTT_ERR_AGAIN`)，避免程序退出。
 *   **修改位置:**  `paho-mqtt/client.py` 文件中 `Client` 类的 `_packet_read` 函数。
 *   **代码示例:**

@@ -229,6 +229,9 @@ async def run_test():
             logger.error("2. 检查 'ws_client.handle_application' 是否被触发。")
             logger.error("3. 检查 'ws_client._send_greeting_message' 中的消息发送逻辑。")
 
+    # # 等待60s观察，mqtt是否会被服务端关闭
+    # await asyncio.sleep(60)
+
     # --- 5. 清理资源 ---
     logger.info("测试结束，正在关闭所有资源...")
     stop_flag.set()

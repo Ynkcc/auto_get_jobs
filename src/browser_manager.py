@@ -23,6 +23,9 @@ class BrowserManager:
         self.browser = None
         self.page = None
         self.save_task = None
+        self.has_more_data_map = {}
+        # 用于存储User-Agent，避免重复获取
+        self.user_agent = None
 
     async def _handle_response(self, response: Response):
         """监听职位列表API响应"""
@@ -31,7 +34,12 @@ class BrowserManager:
             try:
                 data = await response.json()
                 if data.get("code") == 0 and "zpData" in data:
-                    job_list = data["zpData"].get("jobList", [])
+                    zp_data = data["zpData"]
+                    job_list = zp_data.get("jobList", [])
+                    
+                    current_url = self.page.url.split('?')[0]
+                    self.has_more_data_map[current_url] = zp_data.get("hasMore", False)
+
                     if not job_list:
                         logger.warning("本次API响应中职位列表为空")
                         return
@@ -61,6 +69,7 @@ class BrowserManager:
     async def login_and_setup(self) -> bool:
         """
         执行浏览器初始化、用户登录，并设置好后续爬取所需的监听器和定时任务。
+        这是核心的流程控制函数。
         """
         if not self.accounts_config:
             logger.error("未配置任何账号信息，BrowserManager无法启动。")
@@ -76,10 +85,26 @@ class BrowserManager:
                 self.stop_flag.set()
                 return False
 
+            # --- 修复后的核心逻辑 ---
+            # 登录成功后, 在这里统一进行所有依赖登录状态的设置
+            
+            # 1. 首先获取并存储 User-Agent
+            self.user_agent = await self.page.evaluate('() => navigator.userAgent')
+            logger.info(f"成功获取并存储 User-Agent: {self.user_agent}")
+
+            # 2. 然后，首次发布包含了正确User-Agent的会话数据
+            await self._publish_session_data()
+
+            # 3. 接着，启动需要会话数据的后台定时任务
             await self._start_autosave_timer()
+            
+            # 4. 最后，注册页面事件监听器
             self.page.on("response", self._handle_response)
+            
             logger.info("登录和环境设置成功，准备就绪。")
             return True
+            # --- 修复逻辑结束 ---
+
         except Exception as e:
             logger.error(f"登录和设置过程中发生严重错误: {e}", exc_info=True)
             self.stop_flag.set()
@@ -105,13 +130,22 @@ class BrowserManager:
                 
                 logger.info(f"({i+1}/{len(url_list)}) 正在导航至: {url}")
                 await self.page.goto(url, wait_until='domcontentloaded', timeout=60000)
-                
-                for scroll_count in range(self.p_config.scroll_pages):
+                await asyncio.sleep(5)
+
+                current_url_key = self.page.url.split('?')[0]
+                self.has_more_data_map[current_url_key] = True
+
+                scroll_count = 0
+                while self.has_more_data_map.get(current_url_key, False):
                     if self.stop_flag.is_set():
                         break
-                    logger.info(f"正在进行第 {scroll_count+1}/{self.p_config.scroll_pages} 次滚动加载...")
+                    
+                    scroll_count += 1
+                    logger.info(f"正在为URL '{url}' 进行第 {scroll_count} 次滚动加载...")
                     await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
                     await asyncio.sleep(random.uniform(3, 5))
+
+                logger.info(f"URL '{url}' 已无更多数据，停止滚动。")
 
             logger.info("所有搜索URL已处理完毕。")
 
@@ -174,8 +208,13 @@ class BrowserManager:
     async def _publish_session_data(self):
         """获取当前会话数据并发布事件以同步 ZhipinApi"""
         try:
+            # 增加健壮性检查，确保User-Agent已设置
+            if not self.user_agent:
+                logger.warning("User-Agent 尚未设置，暂时无法发布会话数据。")
+                return
+            
             cookies = await self.page.context.cookies()
-            headers = {'User-Agent': await self.page.evaluate('() => navigator.userAgent')}
+            headers = {'User-Agent': self.user_agent}
             await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
             logger.info("会话数据已发布，用于 ZhipinApi 同步")
         except Exception as e:
@@ -191,6 +230,7 @@ class BrowserManager:
                 await self._publish_session_data()
                 
                 try:
+                    # 使用asyncio.sleep，而不是time.sleep
                     await asyncio.sleep(interval)
                 except asyncio.CancelledError:
                     break
@@ -206,10 +246,12 @@ class BrowserManager:
                 pass
             logger.info("自动保存任务已停止")
 
-    async def _login(self):
-        """执行登录流程，并在成功后立即同步会话"""
+    async def _login(self) -> bool:
+        """
+        执行登录流程，此函数现在只负责登录，不处理任何后续设置。
+        """
         if await self._load_login_data():
-            await self._publish_session_data()
+            # 成功后直接返回，不再发布事件
             return True
         
         logger.info("请在浏览器中扫码登录...")
@@ -218,7 +260,7 @@ class BrowserManager:
             await self.page.locator('a[ka="header-username"]').wait_for(timeout=200000)
             logger.info("扫码登录成功")
             await self._save_login_data()
-            await self._publish_session_data()
+            # 成功后直接返回，不再发布事件
             return True
         except asyncio.TimeoutError:
             logger.error("登录超时（200秒），请重新运行程序", exc_info=True)

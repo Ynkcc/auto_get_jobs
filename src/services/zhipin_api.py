@@ -144,11 +144,17 @@ class ZhipinApi:
             self._user_info = {} # 出现异常时清空
             return {}
 
-    def get_user_id(self) -> Optional[int]:
+    def get_user_token(self) -> Optional[int]:
         """
         从缓存的用户信息中获取用于mqtt连接的用户名。
         """
         return self._user_info.get("token")
+
+    def get_user_id(self) -> Optional[int]:
+        """
+        从缓存的用户信息中获取用于mqtt连接的用户名。
+        """
+        return self._user_info.get("userId")
 
     async def get_wt2(self) -> Optional[str]:
         """通过网络请求获取wt2验证参数"""
