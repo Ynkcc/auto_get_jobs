@@ -5,9 +5,10 @@ import logging
 import time
 import ssl
 import json
-import secrets 
+import secrets
 from typing import Dict
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import MessageType
 from google.protobuf import json_format
 
 from ...common.config_manager import ConfigManager
@@ -27,16 +28,16 @@ class WsClient:
         self.app_config = config.application
         self.ai_analyzer = AiAnalyzer()
         self.stop_flag = stop_flag
-        
+
         self.client: patch_client = None
         self.user_token: str = None # token 即 mqtt的用户名
         self.user_id: int = None # 用户ID
         self.wt2: str = None
-        
-        # 新增：用于存储会话信息，由事件更新
+
+        # 用于存储会话信息，由事件更新
         self.headers: dict = {}
         self.cookies: dict = {}
-        
+
         self.is_connected = False
         self.resume_image_md5 = None
         self._prepare_resume_image()
@@ -44,13 +45,11 @@ class WsClient:
         self.sent_count = 0
         self.success_count = 0
         self.reconnect_interval = 8 # 秒
-        # 新增：获取并存储当前的事件循环，用于线程安全的回调
+        # 获取并存储当前的事件循环，用于线程安全的回调
         self.loop = asyncio.get_running_loop()
-        
-        # 新增: 消息队列和跟踪
-        self._msg_queue = []
-        self._sent_messages = {}
-        self._message_identifier = 1
+
+        # 【新增】增加一个状态标志，防止重复关闭
+        self._is_closing = False
 
 
     def _prepare_resume_image(self):
@@ -70,7 +69,7 @@ class WsClient:
     async def _handle_cookies_updated(self, cookies_data: dict, **kwargs):
         """事件订阅函数：处理 cookies 更新，并触发重连以应用新凭据"""
         logger.info("WsClient 收到 cookies_updated 事件，正在更新会话信息并准备重连...")
-        
+
         self.headers = cookies_data.get("headers", {})
         cookies_list = cookies_data.get("cookies", [])
         self.cookies = {c['name']: c['value'] for c in cookies_list}
@@ -93,11 +92,10 @@ class WsClient:
             topic = "chat"
             client.subscribe(topic, qos=1)
             logger.info(f"已订阅主题: {topic}")
-            self._process_queue() # 连接成功后处理队列
         else:
             logger.error(f"WebSocket (MQTT) 连接失败，返回码: {rc}。请检查网络或凭据。")
             self.is_connected = False
-    
+
     def _on_publish(self, client, userdata, mid):
         self.success_count += 1
         logger.debug(f"消息发布成功 (mid: {mid}), 成功数: {self.success_count}, 已发送数: {self.sent_count}")
@@ -119,7 +117,7 @@ class WsClient:
             if not self.wt2:
                  logger.error("刷新 wt2 凭据失败，无法重连")
                  return
-            
+
             self.client.username_pw_set(f"{self.user_token}|0", self.wt2)
 
             cookie_str = "; ".join([f"{k}={v}" for k, v in self.cookies.items()])
@@ -135,7 +133,7 @@ class WsClient:
                 self.client.ws_set_options(path="/chatws", headers=ws_headers)
             else:
                 self.client.ws_options_set(path="/chatws", headers=ws_headers)
-            
+
             self.client.reconnect()
         except Exception as e:
             logger.error(f"重连过程中发生严重错误: {e}", exc_info=True)
@@ -146,14 +144,6 @@ class WsClient:
             protocol = techwolf_pb2.TechwolfChatProtocol()
             protocol.ParseFromString(msg.payload)
             data = json_format.MessageToDict(protocol, preserving_proto_field_name=True)
-            
-            # 处理PUBACK
-            if 'messages' not in data and 'type' in data and data['type'] == o.PUBACK:
-                message_id = data.get('messageIdentifier')
-                if message_id and message_id in self._sent_messages:
-                    logger.info(f"收到 PUBACK for mid: {message_id}")
-                    del self._sent_messages[message_id]
-                return
 
             logger.debug(f"收到已解析消息: {json.dumps(data, indent=2, ensure_ascii=False)}")
             asyncio.run_coroutine_threadsafe(self._handle_protocol_message(data), self.loop)
@@ -172,7 +162,7 @@ class WsClient:
             await self._handle_resume_request(data)
         else:
             logger.debug(f"收到未知的消息类型: {msg_type}，暂不处理。")
-            
+
     async def _handle_chat_message(self, data: dict):
         if not data.get('messages'): return
         message = data['messages'][-1]
@@ -206,7 +196,7 @@ class WsClient:
         """初始化并配置MQTT客户端"""
         client_id = f"ws-{secrets.token_hex(8).upper()}"
         self.client = patch_client(client_id=client_id, transport="websockets")
-        
+
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
@@ -214,7 +204,7 @@ class WsClient:
 
         self.client.tls_set()
         self.client.tls_insecure_set(False)
-        
+
         cookie_str = "; ".join([f"{k}={v}" for k, v in self.cookies.items()])
         ws_headers = {
             "X-CLIENT-ID": client_id,
@@ -227,59 +217,31 @@ class WsClient:
              self.client.ws_set_options(path="/chatws", headers=ws_headers)
         else:
              self.client.ws_options_set(path="/chatws", headers=ws_headers)
-        
+
         auth_username = f"{self.user_token}|0"
         self.client.username_pw_set(auth_username, self.wt2)
 
-    def _requires_ack(self, wire_message):
-        """为需要确认的消息分配ID并存储"""
-        if self._message_identifier >= 65536:
-            self._message_identifier = 1
-        while self._message_identifier in self._sent_messages:
-            self._message_identifier += 1
-        
-        wire_message.message_identifier = self._message_identifier
-        self._sent_messages[wire_message.message_identifier] = wire_message
-
-
     def _publish_proto_message(self, to_uid: str, msg_body: dict):
-        """构建并发送Protobuf消息。"""
+        """构建并直接发布Protobuf消息。"""
+        if not self.is_connected:
+            logger.warning("WebSocket未连接，消息已由paho-mqtt客户端排队。")
+
         timestamp = int(time.time() * 1000)
         chat_dict = {"type": 1, "messages": [{"from": {"uid": "0"}, "to": {"uid": "0", "name": to_uid}, "type": 1, "mid": timestamp, "time": timestamp, "body": msg_body, "cmid": timestamp}]}
-        
+
         try:
             protocol = techwolf_pb2.TechwolfChatProtocol()
             json_format.ParseDict(chat_dict, protocol)
             payload = protocol.SerializeToString()
-            
-            # 创建消息对象并加入队列
-            wire_message = mqtt.MQTTMessage()
-            wire_message.topic = 'chat'
-            wire_message.payload = payload
-            wire_message.qos = 1
-            
-            self._schedule_message(wire_message)
+
+            # 直接发布，paho-mqtt会处理排队和重试
+            self.client.publish('chat', payload, qos=1)
+            self.sent_count += 1
             logger.debug(f"已向主题 'chat' 发布消息至 {to_uid}")
 
         except Exception as e:
             logger.error(f"构建或发布Protobuf消息时出错: {e}", exc_info=True)
-            
-    def _schedule_message(self, message):
-        """将消息加入队列，如果已连接则立即处理"""
-        self._msg_queue.append(message)
-        if self.is_connected:
-            self._process_queue()
-            
-    def _process_queue(self):
-        """处理消息队列中的所有消息"""
-        while self._msg_queue:
-            message = self._msg_queue.pop(0)
-            if message.qos > 0 and not hasattr(message, 'message_identifier'):
-                 self._requires_ack(message)
-                 
-            self.client.publish(message.topic, message.payload, message.qos)
-            self.sent_count += 1
-            
+
     async def _send_greeting_message(self, to_uid: str, greeting_text: str, job_data: dict):
         """发送文本打招呼语和简历图片"""
         self._publish_proto_message(to_uid, {"templateId": 1, "text": greeting_text, "type": 1})
@@ -301,11 +263,11 @@ class WsClient:
         # 订阅事件已移至 main.py
 
         await zhipin_api.wait_for_ready()
-            
+
         self.wt2 = await zhipin_api.get_wt2()
         self.user_token = zhipin_api.get_user_token()
         self.user_id = zhipin_api.get_user_id()
-        
+
         if not all([self.user_token, self.wt2, self.headers, self.cookies]):
             logger.error("无法获取启动 WsClient 所需的完整凭据。客户端将保持非活动状态。")
             await self.stop_flag.wait()
@@ -313,7 +275,7 @@ class WsClient:
 
         logger.info("API客户端已就绪，WsClient开始初始化连接...")
         self._init_client()
-        
+
         try:
             self.client.connect(self.ws_config.host, self.ws_config.port, 60)
             self.client.loop_start()
@@ -325,9 +287,12 @@ class WsClient:
         try:
             await self.stop_flag.wait()
         finally:
-            if self.client:
+            logger.info("收到停止信号，开始优雅关闭 WsClient...")
+            await self.close()
+            if self.client and self.client.is_connected():
                 self.client.loop_stop()
-            logger.info("WebSocket客户端循环已停止")
+            logger.info("WsClient 已完全停止")
+
 
     async def handle_add_friend(self, job_data: dict, greeting_message: str, **kwargs):
         if not self.is_connected:
@@ -352,17 +317,17 @@ class WsClient:
                 logger.warning(f"与 '{job_name}' 的HR建立沟通失败: {message}")
         except Exception as e:
             logger.error(f"发起沟通时发生异常: {e}", exc_info=True)
-            
+
     async def handle_application(self, job_data: dict, greeting_message: str, **kwargs):
-        if not self.is_connected:
-            logger.warning("WebSocket未连接，无法发送招呼语")
-            return
-        
+        if not self.is_connected and not self.client:
+             logger.warning("客户端未初始化，无法发送招呼语")
+             return
+
         encrypt_geek_id = job_data.get("bossInfo", {}).get("encBossId")
         if not encrypt_geek_id:
             logger.error("职位数据中未找到对方ID (encBossId)，无法发送消息")
             return
-            
+
         greeting = greeting_message
         if not greeting:
             greeting = "你好，我对这个职位感兴趣，希望能进一步了解。"
@@ -374,7 +339,40 @@ class WsClient:
         except Exception as e:
             logger.error(f"处理投递申请时发生异常: {e}", exc_info=True)
 
-    async def close(self, **kwargs):
-        if self.is_connected and self.client:
-            self.client.disconnect()
-        logger.info("WsClient 已关闭")
+    async def close(self, timeout=10):
+        """
+        【修改】优雅地断开连接，等待所有消息发送和确认。
+        通过状态标志防止重复执行。
+        """
+        # 【修改】如果正在关闭，则直接返回，防止重复执行
+        if self._is_closing:
+            logger.info("关闭流程已在进行中，跳过重复请求。")
+            return
+        self._is_closing = True
+
+        if not self.client:
+            logger.info("客户端未初始化，无需断开。")
+            return
+
+        logger.info("开始优雅断开流程...")
+
+        # 等待消息队列清空
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            # 【修改】修正队列大小的获取方式
+            # _out_messages 是一个类字典，需要用 len()
+            # _inflight_messages 是一个整数，直接使用
+            out_queue_size = len(self.client._out_messages) if hasattr(self.client, '_out_messages') else 0
+            inflight_queue_size = self.client._inflight_messages if hasattr(self.client, '_inflight_messages') else 0
+
+            if out_queue_size == 0 and inflight_queue_size == 0:
+                logger.info("所有待处理消息已发送和确认。")
+                break
+
+            logger.info(f"等待消息队列清空... 待发送: {out_queue_size}, 待确认: {inflight_queue_size}")
+            await asyncio.sleep(0.5)
+        else:
+            logger.warning(f"优雅断开超时（{timeout}秒），可能仍有未处理的消息。")
+
+        self.client.disconnect()
+        logger.info("已向MQTT代理发送断开连接请求。")

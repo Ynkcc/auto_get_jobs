@@ -1,6 +1,6 @@
 # src/main.py
 import asyncio
-import signal
+# import signal
 import logging
 import logging.config
 
@@ -57,14 +57,14 @@ zhipin_api.reinitialize_config()
 
 stop_flag = asyncio.Event()
 
-def signal_handler(sig, frame):
-    logger.info(f"接收到停止信号 {sig}, 正在准备关闭...")
-    if not stop_flag.is_set():
-        stop_flag.set()
+# def signal_handler(sig, frame):
+#     logger.info(f"接收到停止信号 {sig}, 正在准备关闭...")
+#     if not stop_flag.is_set():
+#         stop_flag.set()
 
 async def main():
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # signal.signal(signal.SIGINT, signal_handler)
+    # signal.signal(signal.SIGTERM, signal_handler)
 
     # 1. 初始化所有模块
     logger.info("开始初始化所有模块...")
