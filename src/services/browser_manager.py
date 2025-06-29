@@ -7,25 +7,30 @@ import os
 from playwright.async_api import async_playwright, Response, Page, Error
 from typing import List, Dict
 
-from .common.event_manager import event_manager
-from .common.file_utils import build_search_url
+from ..common.event_manager import event_manager
+from ..common.file_utils import build_search_url
 
 logger = logging.getLogger(__name__)
 
 class BrowserManager:
-    def __init__(self, config, stop_flag):
+    # --- 在构造函数中接收 pause_event ---
+    def __init__(self, config, stop_flag, pause_event):
         self.p_config = config.crawler.playwright
         self.accounts_config = config.accounts[0] if config.accounts else None
         self.job_search_config = config.job_search
         
         self.stop_flag = stop_flag
+        # --- 新增: 保存暂停事件 ---
+        self.pause_event = pause_event 
+        
         self.playwright = None
         self.browser = None
         self.page = None
         self.save_task = None
         self.has_more_data_map = {}
-        # 用于存储User-Agent，避免重复获取
         self.user_agent = None
+        self._is_fetching = asyncio.Lock()
+
 
     async def _handle_response(self, response: Response):
         """监听职位列表API响应"""
@@ -37,11 +42,12 @@ class BrowserManager:
                     zp_data = data["zpData"]
                     job_list = zp_data.get("jobList", [])
                     
-                    current_url = self.page.url.split('?')[0]
-                    self.has_more_data_map[current_url] = zp_data.get("hasMore", False)
+                    current_url_key = self.page.url
+                    self.has_more_data_map[current_url_key] = zp_data.get("hasMore", False)
 
                     if not job_list:
-                        logger.warning("本次API响应中职位列表为空")
+                        logger.info("本次API响应中职位列表为空或已无更多数据")
+                        self.has_more_data_map[current_url_key] = False
                         return
                     
                     await event_manager.publish("job_list_found", jobs=job_list)
@@ -57,7 +63,32 @@ class BrowserManager:
         try:
             logger.info("正在初始化 Playwright 浏览器...")
             self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(headless=self.p_config.headless)
+            
+            browser_type = self.p_config.browser_type.lower()
+            logger.info(f"正在启动浏览器: {browser_type}")
+
+            launch_options = {
+                "headless": self.p_config.headless,
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    '--log-level=3',
+                ],
+                "ignore_default_args": ["--enable-automation"],
+            }
+
+            if browser_type == "chromium":
+                self.browser = await self.playwright.chromium.launch(**launch_options)
+            elif browser_type == "chrome":
+                self.browser = await self.playwright.chromium.launch(channel="chrome", **launch_options)
+            elif browser_type == "firefox":
+                self.browser = await self.playwright.firefox.launch(**launch_options)
+            elif browser_type == "webkit":
+                self.browser = await self.playwright.webkit.launch(**launch_options)
+            elif browser_type == "edge":
+                 self.browser = await self.playwright.chromium.launch(channel="msedge", **launch_options)
+            else:
+                raise ValueError(f"不支持的浏览器类型: {browser_type}")
+
             context = await self.browser.new_context()
             self.page = await context.new_page()
             logger.info("浏览器初始化成功。")
@@ -69,7 +100,6 @@ class BrowserManager:
     async def login_and_setup(self) -> bool:
         """
         执行浏览器初始化、用户登录，并设置好后续爬取所需的监听器和定时任务。
-        这是核心的流程控制函数。
         """
         if not self.accounts_config:
             logger.error("未配置任何账号信息，BrowserManager无法启动。")
@@ -85,75 +115,80 @@ class BrowserManager:
                 self.stop_flag.set()
                 return False
 
-            # --- 修复后的核心逻辑 ---
-            # 登录成功后, 在这里统一进行所有依赖登录状态的设置
-            
-            # 1. 首先获取并存储 User-Agent
             self.user_agent = await self.page.evaluate('() => navigator.userAgent')
-            logger.info(f"成功获取并存储 User-Agent: {self.user_agent}")
+            logger.info(f"成功获取并存储 User-Agent")
 
-            # 2. 然后，首次发布包含了正确User-Agent的会话数据
             await self._publish_session_data()
-
-            # 3. 接着，启动需要会话数据的后台定时任务
             await self._start_autosave_timer()
             
-            # 4. 最后，注册页面事件监听器
             self.page.on("response", self._handle_response)
             
-            logger.info("登录和环境设置成功，准备就绪。")
+            logger.info("登录和环境设置成功，浏览器已准备就绪。")
             return True
-            # --- 修复逻辑结束 ---
 
         except Exception as e:
             logger.error(f"登录和设置过程中发生严重错误: {e}", exc_info=True)
             self.stop_flag.set()
             return False
-
-    async def start_crawling(self):
+    
+    async def start_fetching_jobs(self, **kwargs):
         """
-        开始执行爬取任务，遍历搜索URL并滚动页面以加载数据。
+        【事件处理器】开始执行爬取任务，遍历搜索URL并滚动页面以加载数据。
         """
-        if not self.page or self.page.is_closed():
-            logger.error("无法开始爬取：浏览器页面未初始化或已关闭。")
-            self.stop_flag.set()
-            return
+        async with self._is_fetching:
+            # 重置停止标志，确保每次任务都是新的状态
+            self.stop_flag.clear() 
+            
+            if not self.page or self.page.is_closed():
+                logger.error("无法开始爬取：浏览器页面未初始化或已关闭。")
+                self.stop_flag.set()
+                await event_manager.publish("fetch_jobs_complete")
+                return
 
-        try:
-            url_list = build_search_url(self.job_search_config)
-            logger.info(f"共生成 {len(url_list)} 个搜索URL")
+            try:
+                url_list = build_search_url(self.job_search_config)
+                logger.info(f"共生成 {len(url_list)} 个搜索URL")
 
-            for i, url in enumerate(url_list):
-                if self.stop_flag.is_set():
-                    logger.info("接收到停止信号，停止爬取新页面。")
-                    break
-                
-                logger.info(f"({i+1}/{len(url_list)}) 正在导航至: {url}")
-                await self.page.goto(url, wait_until='domcontentloaded', timeout=60000)
-                await asyncio.sleep(5)
-
-                current_url_key = self.page.url.split('?')[0]
-                self.has_more_data_map[current_url_key] = True
-
-                scroll_count = 0
-                while self.has_more_data_map.get(current_url_key, False):
+                for i, url in enumerate(url_list):
                     if self.stop_flag.is_set():
+                        logger.info("接收到停止信号，终止爬取任务。")
                         break
                     
-                    scroll_count += 1
-                    logger.info(f"正在为URL '{url}' 进行第 {scroll_count} 次滚动加载...")
-                    await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                    # --- 在循环开始时检查暂停状态 ---
+                    await self.pause_event.wait()
+                    
+                    logger.info(f"({i+1}/{len(url_list)}) 正在导航至: {url}")
+                    await self.page.goto(url, wait_until='domcontentloaded', timeout=60000)
                     await asyncio.sleep(random.uniform(3, 5))
 
-                logger.info(f"URL '{url}' 已无更多数据，停止滚动。")
+                    current_url_key = self.page.url
+                    self.has_more_data_map[current_url_key] = True
 
-            logger.info("所有搜索URL已处理完毕。")
+                    await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                    await asyncio.sleep(random.uniform(4, 6))
 
-        except Exception as e:
-            logger.error(f"爬取过程中发生严重错误: {e}", exc_info=True)
-        finally:
-            logger.info("爬取任务结束，设置停止标志以关闭整个程序。")
-            self.stop_flag.set()
+                    scroll_count = 0
+                    while self.has_more_data_map.get(current_url_key, False):
+                        if self.stop_flag.is_set():
+                            break
+                        
+                        # --- 在滚动前检查暂停状态 ---
+                        await self.pause_event.wait()
+
+                        scroll_count += 1
+                        logger.info(f"正在为URL进行第 {scroll_count} 次滚动加载...")
+                        await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                        await asyncio.sleep(random.uniform(4, 6))
+
+                    logger.info(f"URL '{url}' 已无更多数据，停止滚动。")
+
+                logger.info("所有搜索URL已处理完毕。")
+
+            except Exception as e:
+                logger.error(f"爬取过程中发生严重错误: {e}", exc_info=True)
+            finally:
+                logger.info("获取岗位任务流程结束。")
+                await event_manager.publish("fetch_jobs_complete")
 
     async def _load_login_data(self) -> bool:
         """从文件加载登录数据（cookies）"""
@@ -208,7 +243,6 @@ class BrowserManager:
     async def _publish_session_data(self):
         """获取当前会话数据并发布事件以同步 ZhipinApi"""
         try:
-            # 增加健壮性检查，确保User-Agent已设置
             if not self.user_agent:
                 logger.warning("User-Agent 尚未设置，暂时无法发布会话数据。")
                 return
@@ -216,7 +250,7 @@ class BrowserManager:
             cookies = await self.page.context.cookies()
             headers = {'User-Agent': self.user_agent}
             await event_manager.publish("cookies_updated", cookies_data={"cookies": cookies, "headers": headers})
-            logger.info("会话数据已发布，用于 ZhipinApi 同步")
+            logger.info("会话数据已发布，用于 ZhipinApi 及 WsClient 同步")
         except Exception as e:
             logger.error(f"发布会话数据时出错: {e}", exc_info=True)
 
@@ -226,14 +260,12 @@ class BrowserManager:
         
         async def saver():
             while not self.stop_flag.is_set():
-                await self._save_login_data()
-                await self._publish_session_data()
-                
-                try:
-                    # 使用asyncio.sleep，而不是time.sleep
-                    await asyncio.sleep(interval)
-                except asyncio.CancelledError:
-                    break
+                await asyncio.sleep(interval)
+                if self.page and not self.page.is_closed(): # 增加检查
+                    await self._save_login_data()
+                    await self._publish_session_data()
+                else:
+                    break # 页面关闭则退出循环
         self.save_task = asyncio.create_task(saver())
 
     async def _stop_autosave_timer(self):
@@ -247,11 +279,8 @@ class BrowserManager:
             logger.info("自动保存任务已停止")
 
     async def _login(self) -> bool:
-        """
-        执行登录流程，此函数现在只负责登录，不处理任何后续设置。
-        """
+        """执行登录流程，只负责登录，不处理后续设置。"""
         if await self._load_login_data():
-            # 成功后直接返回，不再发布事件
             return True
         
         logger.info("请在浏览器中扫码登录...")
@@ -260,7 +289,6 @@ class BrowserManager:
             await self.page.locator('a[ka="header-username"]').wait_for(timeout=200000)
             logger.info("扫码登录成功")
             await self._save_login_data()
-            # 成功后直接返回，不再发布事件
             return True
         except asyncio.TimeoutError:
             logger.error("登录超时（200秒），请重新运行程序", exc_info=True)
@@ -282,4 +310,8 @@ class BrowserManager:
                 await self.playwright.stop()
         except Exception as e:
             logger.error(f"关闭浏览器时发生错误: {e}", exc_info=True)
-        logger.info("浏览器已成功关闭")
+        finally:
+            self.browser = None
+            self.playwright = None
+            self.page = None
+            logger.info("浏览器已成功关闭")

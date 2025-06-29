@@ -1,366 +1,262 @@
-'''
-original code from https://github.com/xmiaoq/bossbot
-EditBy : Ynkcc
-'''
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# test_ws_client.py
+import asyncio
 import logging
-import threading
-import time
 import json
-import queue
-import paho.mqtt.enums
-import socks
-import requests
-import paho.mqtt.client as mqtt
-import paho.mqtt
-from src.ws_client.techwolf_pb2 import TechwolfChatProtocol
-from google.protobuf import json_format
-import secrets
-class WSclient(threading.Thread):
-    hostname = "ws6.zhipin.com"
-    port = 443
-    path = '/chatws'
-    topic = 'chat'
-    reconnect_interval = 10  # 重连间隔秒数
-    uid = None
-    token = None
-    wt2= None
+import os
+
+# 确保脚本可以从根目录找到src模块
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+
+from src.services.ws_client.client import WsClient
+from src.common.config_manager import ConfigManager
+from src.common.event_manager import event_manager
+from src.services.zhipin_api import zhipin_api
+
+# --- 1. 基本配置 ---
+# 配置日志，方便观察过程
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+# 屏蔽一些第三方库的冗余日志
+logging.getLogger('websockets').setLevel(logging.WARNING)
+logging.getLogger('paho').setLevel(logging.WARNING)
+logger = logging.getLogger("WS_CLIENT_TEST")
+
+# --- 2. 准备测试数据 ---
+# !!! 警告: 请务必在运行前替换下方所有 "xxxxxxxx" 为一个真实、有效且未投递过的岗位ID信息。
+# 你可以通过浏览器开发者工具抓取API请求来获取这些ID。
+FIXED_JOB_DATA_JSON = '''
+{
+
+        "pageType": 0,
+        "selfAccess": false,
+        "securityId": "w1cYVBhAEjwQ4-M1U0ZI31PJeHliYk9NGM54WJIOHpDhrbgONbJ1HHuyT2ykwVS_PmGctrpFqhrZE3-aajdmYco03iZGygRSpePRNxyhi4dN33uYQd24Z2GgaoY0hrx2neN50335wZPq9DlCZX1R29SN2NFX_A~~",
+        "sessionId": null,
+        "lid": "4C2BUgdCrka.search.4",
+        "jobInfo": {
+            "encryptId": "df22f9b990ba49f81Hx_3Nq4EVpZ",
+            "encryptUserId": "89b9fc4097c345460XN82tW5F1RU",
+            "invalidStatus": false,
+            "jobName": "IT技术支持",
+            "position": 100405,
+            "positionName": "IT技术支持",
+            "location": 101310100,
+            "locationName": "海口",
+            "experienceName": "1-3年",
+            "degreeName": "大专",
+            "jobType": 0,
+            "proxyJob": 0,
+            "proxyType": 0,
+            "salaryDesc": "5-10K",
+            "payTypeDesc": null,
+            "postDescription": "工作内容\\n1、为企业内部用户提供专业的IT技术支持与服务。\\n2、参与售前与售后技术支持活动，确保技术问题得到有效解决。\\n3、与团队合作，共同维护和优化IT系统。\\n\\n任职要求\\n1、具备扎实的IT技术支持背景，能够独立处理技术难题。\\n2、熟悉计算机或通信领域的技术标准和操作流程。\\n3、具有良好的团队合作精神和客户服务意识。",
+            "encryptAddressId": "4b402f397614f6d71nZ80ty-GVpTw4-5VPuc",
+            "address": "海口龙华区海口市新华信息产业孵化园(新华南路)5层",
+            "longitude": 110.344014,
+            "latitude": 20.03833,
+            "staticMapUrl": "https://img.bosszhipin.com/beijin/upload/amap_proxy/20231018/48ba41acc9cef1bf5789e45458daa1285cddf899145be7b86bb61e3b7bce0931da574d19d1d82c88.png.webp",
+            "pcStaticMapUrl": "https://img.bosszhipin.com/beijin/upload/amap_proxy/20240511/48ba41acc9cef1bf053dc1dd79ba449ab369ba22d30fadfa6bb61e3b7bce0931da574d19d1d82c88.png.webp",
+            "baiduStaticMapUrl": "",
+            "baiduPcStaticMapUrl": "",
+            "overseasAddressList": [],
+            "overseasInfo": null,
+            "showSkills": [
+                "企业内部IT技术支持",
+                "IT技术支持经验",
+                "售前/售后技术支持",
+                "计算机/通信相关专业"
+            ],
+            "anonymous": 0,
+            "jobStatusDesc": "招聘中"
+        },
+        "bossInfo": {
+            "name": "冯先生",
+            "title": "招聘者",
+            "tiny": "https://img.bosszhipin.com/boss/avatar/avatar_6.png",
+            "large": "https://img.bosszhipin.com/boss/avatar/avatar_6.png",
+            "activeTimeDesc": "4月内活跃",
+            "bossOnline": false,
+            "brandName": "小贝科技",
+            "bossSource": 0,
+            "certificated": true,
+            "tagIconUrl": null,
+            "avatarStickerUrl": null
+        },
+        "brandComInfo": {
+            "encryptBrandId": "bd103f6e30af5c721HN40tW6EVc~",
+            "brandName": "小贝科技",
+            "logo": "https://img.bosszhipin.com/beijin/icon/894ce6fa7e58d64d57e7f22d2f3a9d18afa7fcceaa24b8ea28f56f1bb14732c0.png",
+            "stage": 0,
+            "stageName": "",
+            "scale": 302,
+            "scaleName": "20-99人",
+            "industry": 100020,
+            "industryName": "互联网",
+            "introduce": "",
+            "labels": [],
+            "activeTime": 1748198086909,
+            "visibleBrandInfo": true,
+            "focusBrand": false,
+            "customerBrandName": "小贝科技",
+            "customerBrandStageName": ""
+        },
+        "oneKeyResumeInfo": {
+            "inviteType": 0,
+            "alreadySend": false,
+            "canSendResume": false,
+            "canSendPhone": false,
+            "canSendWechat": false
+        },
+        "relationInfo": {
+            "interestJob": false,
+            "beFriend": false
+        },
+        "handicappedInfo": null,
+        "appendixInfo": {
+            "canFeedback": false,
+            "chatBubble": null
+        },
+        "atsOnlineApplyInfo": {
+            "inviteType": 0,
+            "alreadyApply": false
+        },
+        "certMaterials": []
+    }
+
+'''
+FIXED_JOB_DATA= json.loads(FIXED_JOB_DATA_JSON, strict=False)
+
+# 指定包含cookies的账号文件
+ACCOUNT_FILE = 'data/account1.json'
 
 
-    def __init__(self, recv_queue, running_event, image_dict=None,headers=None, cookies=None, logger=None):
-        """
-        初始化WebSocket客户端
-        :param recv_queue: 接收任务队列(Queue类型)
-        :param headers: 请求头字典
-        :param cookies: cookies字典
-        """
-        super().__init__(daemon=True)
-        self.recv_queue = recv_queue
-        self.headers = headers or {}
-        self.cookies = cookies or {}
-        self.logger = logger or logging.getLogger(__name__)
-        self.image_dict=image_dict
-        client_id =f"ws-{secrets.token_hex(8).upper()}"
-        # MQTT客户端配置
-        self.client = mqtt.Client(
-            client_id=client_id,
-            protocol=4,
-            transport='websockets',
-            clean_session=True
-        )
-        self._setup_callbacks()
-        self._running = running_event
-
-    def _setup_callbacks(self):
-        """配置回调函数"""
-        self.client.on_connect = self._on_connect
-        self.client.on_message = self._on_message
-        self.client.on_disconnect = self._on_disconnect
-
-    def _on_connect(self, client, userdata, flags, rc):
-        """连接成功回调"""
-        if rc == 0:
-            self.logger.info("WebSocket connected successfully")
-            client.subscribe(self.topic)
-        else:
-            self.logger.error(f"Connection failed with code {rc}")
-
-    def _on_disconnect(self, client, userdata, rc):
-        """连接断开回调"""
-        self.logger.warning(f"Disconnected with code {rc}")
-        if self._running.is_set():
-            self._reconnect()
-
-    def _on_message(self, client, userdata, msg):
-        """消息接收处理"""
-        self.logger.debug("receive message")
-        try:
-            protocol = TechwolfChatProtocol()
-            protocol.ParseFromString(msg.payload)
-            data = json_format.MessageToDict(protocol)
-            self.logger.debug(json.dumps(data,indent=4,ensure_ascii=False))
-            self._handle_protocol_message(data)
-        except Exception as e:
-            self.logger.error(f"Message processing error: {str(e)}")
-    def _handle_protocol_message(self, data):
-        """协议消息分发处理"""
-        msg_type = data.get('type')
-        handler = {
-            1: self._handle_chat_message,
-            4: self._handle_suggest_message,
-            6: self._handle_sync_message,
-            7: self._handle_resume_request
-        }.get(msg_type, lambda x: None)
-        
-        handler(data)
+async def run_test():
 
 
+    # 1. 初始化所有模块
+    logger.info("开始初始化所有模块...")
 
-    def _handle_chat_message(self, data):
-        """处理聊天消息"""
-        message = data['messages'][-1]
-        body = message['body']
-        
-        if body['type'] == 1:
-            self.on_text_message(
-                from_uid=message['from']['uid'],
-                text=body['text'],
-                timestamp=message['time']
-            )
-
-    def _handle_resume_request(self, data):
-        """处理简历请求"""
-        message = data['messages'][-1]
-        if message['from']['uid'] != self.uid:
-            self.on_request_resume(
-                boss_id=message['from']['uid'],
-                mid=message['mid']
-            )
-
-    def _handle_suggest_message(self,data):
-        pass
-    def _handle_sync_message(self,data):
-        pass
-    def _reconnect(self):
-        """实现自动重连机制"""
-        while self._running.is_set():
-            try:
-                self.logger.info("Attempting to reconnect...")
-                self.client.reconnect()
-                return
-            except Exception as e:
-                self.logger.error(f"Reconnect failed: {str(e)}")
-                time.sleep(self.reconnect_interval)
+    # 2. 注册事件订阅者 (新的事件流)
+    logger.info("开始注册事件订阅者...")
+    
+    # BrowserManager定时发布的会话更新事件，由ZhipinApi处理
+    event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
 
 
-    def send_message(self,task):
-        """
-        发送文本消息
-        :param boss_id: 对方boss_id
-        :param msg: 消息内容
-        :return:
-        """
-        msgtype,boss_id,msg = task
-        try:
-            protocol = TechwolfChatProtocol()
-            mid = int(time.time() * 1000)
-            chat = {
-                "type": 1,
-                "messages": [
-                    {
-                        "from": {
-                            "uid": "0"
-                        },
-                        "to": {
-                            "uid": "0",
-                            "name": boss_id
-                        },
-                        "type": 1,
-                        "mid": mid,
-                        "time": int(time.time() * 1000),
-                        "body": {
-                            
-                            "templateId": 1,
+    event_manager.subscribe("shutdown", zhipin_api.close)
+    logger.info("事件订阅者注册完成")
+    """执行完整的投递测试流程"""
+    logger.info("="*20 + " WebSocket客户端投递测试 " + "="*20)
+    
+    # --- 3. 初始化环境 ---
+    try:
+        ConfigManager.load_config('config/config.yaml')
+        config = ConfigManager.get_config()
+        zhipin_api.reinitialize_config()
+        logger.info("配置加载成功。")
+    except Exception as e:
+        logger.error(f"加载配置 'config/config.yaml' 失败: {e}")
+        return
 
-                        },
-                        "cmid": mid
-                    }
-                ]
+    # 创建停止标志和WsClient实例
+    stop_flag = asyncio.Event()
+    ws_client = WsClient(config, stop_flag)
+    # 订阅 cookies 更新事件，由 WsClient 处理
+    event_manager.subscribe("cookies_updated", ws_client._handle_cookies_updated)
+    # 模拟BrowserManager，从文件加载cookies并初始化ZhipinApi
+    try:
+        with open(ACCOUNT_FILE, 'r', encoding='utf-8') as f:
+            account_data = json.load(f)
+        if "headers" not in account_data:
+            account_data["headers"] = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
             }
-            if msgtype=="msg":
-                chat["messages"][0]["body"]["text"]=msg
-                chat["messages"][0]["body"]["type"]=1
-            elif msgtype=="image":
-                chat["messages"][0]["body"]["type"]=3
-                chat["messages"][0]["body"]["image"]={"originImage":self.image_dict}
-            else:
-                return
-            print(json.dumps(chat, indent=4))
-            json_format.ParseDict(chat, protocol)
-            publish_result=self.client.publish(self.topic, protocol.SerializeToString(),1)
-            print(publish_result)
-        except Exception as e:
-            self.logger.error(f"Failed to send application: {str(e)}")
+        # 发布事件，让ZhipinApi更新会话并进入就绪状态
+        await event_manager.publish("cookies_updated", cookies_data=account_data)
+        logger.info(f"已从 '{ACCOUNT_FILE}' 加载账号信息并初始化API。")
+    except FileNotFoundError:
+        logger.error(f"账号文件未找到: '{ACCOUNT_FILE}'。测试无法继续。")
+        return
+    except Exception as e:
+        logger.error(f"初始化API会话失败: {e}", exc_info=True)
+        return
 
-    def run(self):
-        """主运行循环"""
+    # 启动 WsClient 的主循环任务
+    ws_task = asyncio.create_task(ws_client.run())
 
-        self.uid, self.token = self.get_userinfo()
-        self.wt2=self.get_wt2()
-
-        # 配置WebSocket连接
-        ws_headers = {
-            "Cookie": "; ".join([f"{k}={v}" for k, v in self.cookies.items()]),
-            "User-Agent": self.headers.get('User-Agent', '')
-        }
-
-        options = {
-            'path': self.path,
-            'headers': ws_headers
-        }
-        self.client.ws_set_options(**options)
-        self.client.proxy_set(proxy_type=socks.HTTP, proxy_addr="127.0.0.1", proxy_port=8888)
-        self.client.tls_set()
-        self.client.tls_insecure_set(False)
-        self.client.enable_logger()
-        self.client.username_pw_set(self.token+"|0", self.wt2)
-
-        # 建立连接
-        self.client.connect(self.hostname, self.port, keepalive=25)
-        self.client.loop_start()
-        self._running.set()
-        # 任务处理循环
-        while self._running.is_set():
-            try:
-                task = self.recv_queue.get(timeout=1)
-                if task:
-                    self.send_message(task)
-                    time.sleep(2)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                self.logger.error(f"Task processing error: {str(e)}")
-        self.stop()
-
-    def stop(self):
-        """安全停止客户端"""
-        self._running.clear()
-        self.client.disconnect()
-        self.client.loop_stop()
-
-    def get_userinfo(self):
-        """获取用户身份信息"""
-        try:
-            url = "https://www.zhipin.com/wapi/zpuser/wap/getUserInfo.json"
-            response = requests.get(
-                url,
-                cookies=self.cookies,
-                headers=self.headers,
-                timeout=10
-            )
-            response.raise_for_status()
-            user_info = response.json()
-            
-            if user_info['code'] == 0:
-                zp_data = user_info['zpData']
-                return (
-                    zp_data.get('userId'),
-                    zp_data.get('token')
-                )
-            raise Exception(f"获取用户信息失败: {user_info.get('message')}")
-        except Exception as e:
-            self.logger.error(f"获取用户信息异常: {str(e)}")
-            return None, None, None
-
-    def get_boss_data(self,encryptBossId):
-        try:
-            baseurl = "https://www.zhipin.com"
-            path='/wapi/zpchat/geek/getBossData'
-            url=baseurl+path
-            params = {
-                "bossId": encryptBossId,
-                "bossSource":0
-            }
-            response = requests.get(
-                url,
-                params=params,
-                cookies=self.cookies,
-                headers=self.headers,
-                timeout=10
-            )
-            response.raise_for_status()
-            boss_info = response.json()
-            
-            if boss_info['code'] == 0:
-                zp_data = boss_info['zpData']["data"]
-                return (zp_data.get('bossId'),boss_info)
-
-        except Exception as e:
-
-            return None
-
+    # --- 4. 执行测试 ---
+    logger.info("正在等待WsClient连接服务器... (最长等待15秒)")
+    # 等待 WsClient 内部的 is_connected 标志位变为 True
+    for _ in range(15):
+        if ws_client.is_connected:
+            break
+        await asyncio.sleep(1)
+    
+    if not ws_client.is_connected:
+        logger.error("WsClient未能连接，测试终止。请检查网络、账号凭据或WsClient的实现。")
+    else:
+        logger.info("WsClient已成功连接服务器。现在模拟发起一次投递。")
         
-    def get_wt2(self):
-        """获取wt2验证参数"""
+        # --- 修改开始: 订阅核心投递流程事件 ---
+        # 订阅 'add_friend' 事件，由 ws_client.handle_add_friend 处理，它会调用API发起沟通
+        event_manager.subscribe("add_friend", ws_client.handle_add_friend)
+        # 订阅 'apply_to_job' 事件，由 ws_client.handle_application 处理，它会在沟通成功后发送问候语
+        event_manager.subscribe("apply_to_job", ws_client.handle_application)
+        # --- 修改结束 ---
+
+        # 为了验证完整流程，我们监听最终的成功事件
+        application_confirmed = asyncio.Event()
+        async def confirm_application_sent(job_data, **kwargs):
+            logger.info("***** 流程确认: 收到 'application_sent_successfully' 事件! *****")
+            application_confirmed.set()
+
+        event_manager.subscribe("application_sent_successfully", confirm_application_sent)
+
+        # 发布 "add_friend" 事件，这是整个投递流程的起点
+        logger.info(f"发布 'add_friend' 事件，目标职位: {FIXED_JOB_DATA.get('jobInfo', {}).get('jobName')}")
+        await event_manager.publish("add_friend", job_data=FIXED_JOB_DATA, greeting_message="你好，我对这个职位很感兴趣，希望能进一步了解。")
+
+        # 等待最终确认事件，或超时
         try:
-            url = "https://www.zhipin.com/wapi/zppassport/get/wt"
-            response = requests.get(
-                url,
-                cookies=self.cookies,
-                headers=self.headers,
-                timeout=10
-            )
-            response.raise_for_status()
-            wt2_data = response.json()
-            
-            if wt2_data['code'] == 0:
-                return wt2_data['zpData'].get('wt2')
-            raise Exception(f"获取wt2失败: {wt2_data.get('message')}")
-        except Exception as e:
-            self.logger.error(f"获取wt2异常: {str(e)}")
-            return None
+            await asyncio.wait_for(application_confirmed.wait(), timeout=30.0)
+            logger.info("【测试成功】: 在30秒内确认投递流程已执行完毕。")
+        except asyncio.TimeoutError:
+            logger.error("【测试失败】: 30秒内未收到投递成功确认事件。")
+            logger.error("诊断建议: ")
+            logger.error("1. 检查 'zhipin_api.start_chat' 是否成功 (如果失败，不会有后续事件)。")
+            logger.error("2. 检查 'ws_client.handle_application' 是否被触发。")
+            logger.error("3. 检查 'ws_client._send_greeting_message' 中的消息发送逻辑。")
 
-    # 以下为需要外部实现的回调接口
-    def on_text_message(self, from_uid, text, timestamp):
-        """收到文字消息回调（需子类实现）"""
-        pass
+    # # 等待60s观察，mqtt是否会被服务端关闭
+    # await asyncio.sleep(60)
 
-    def on_request_resume(self, boss_id, mid):
-        """收到简历请求回调（需子类实现）"""
-        pass
+    # --- 5. 清理资源 ---
+    logger.info("测试结束，正在关闭所有资源...")
+    stop_flag.set()
+    await asyncio.sleep(2)  # 等待任务响应停止信号
+    await ws_client.close()
+    await zhipin_api.close()
+    if ws_task:
+        ws_task.cancel()
+        try:
+            await ws_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("测试脚本执行完毕。")
 
-    def on_application_result(self, job_id, result):
-        """职位申请结果回调（需子类实现）"""
-        pass
 
 if __name__ == "__main__":
-    # 测试用参数
-    test_queue = queue.Queue()
-    test_event = threading.Event()
-    test_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}
-    with open("data/account1.json","r",encoding="utf8") as f:
-        cookies = json.load(f)["cookies"]
-    cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies}
-    test_logger = logging.getLogger("ws_client")
-    test_logger.setLevel(logging.DEBUG)  # 设置最低记录级别
-
-    # 创建 Handler（控制台 + 文件）
-    console_handler = logging.StreamHandler()
-
-    # 设置 Handler 级别
-    console_handler.setLevel(logging.DEBUG)  # 控制台只记录 WARNING 及以上
-
-    # 定义日志格式
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    console_handler.setFormatter(formatter)
-
-    # 将 Handler 添加到 Logger
-    test_logger.addHandler(console_handler)
-    image_dict={
-                        "url": "https://imgaz.bosszhipin.com/beijin/zp/chat/file/20250310/ff9281aff23153dfaa70dc6b8fe7edd32c2a2201144e4917d6fdbaaac6966d6a8ef5e5092165499b.jpg.webp?auth_key=1741742640-0-a8b1a3c7c1449de60n1y29S5F1ZU-62b0946c240343fc4bd564340b7163de",
-                        "width": 1080,
-                        "height": 1079
-                    }
-    client = WSclient(
-        recv_queue=test_queue,
-        running_event=test_event,
-        image_dict=image_dict,
-        headers=test_headers,
-        cookies=cookies_dict,
-        logger=test_logger
-    )
-    
-
-    test_event.set()
-    client.start()
-    test_queue.put(("image","3aa60c387c96fc671X172d66GFM~",""))
-    time.sleep(10)
-    test_queue.put(("image","3aa60c387c96fc671X172d66GFM~",""))
-    # ws_queue.put(("task",["image","UgEoLMYu9WPMn-L1hqffGiml1W-xDXwHsToIb2A0_ZkapolHvCIqQWRSIJSuYmfvOsTnCYrUhYODQA08mdiDjLyFN8SwqxdkX_dtJGoI--vT-Z1b2A~~","3aa60c387c96fc671X172d66GFM~",""]))
-    # time.sleep(600)
-    input("按下任意键，退出")
+    if 'xxxxxxxx' in FIXED_JOB_DATA['securityId']:
+        print("="*60)
+        print("【运行前必读】")
+        print("请打开 `test_ws_client.py` 文件, 修改 `FIXED_JOB_DATA` 字典。")
+        print("将其中所有的 'xxxxxxxx' 替换为一个真实、有效且未投递过的岗位ID。")
+        print(f"同时，请确保有效的账号cookie文件 '{ACCOUNT_FILE}' 存在。")
+        print("="*60)
+    else:
+        try:
+            asyncio.run(run_test())
+        except KeyboardInterrupt:
+            logger.info("测试被手动中断。")
