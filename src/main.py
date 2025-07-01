@@ -5,14 +5,14 @@ import logging.config
 
 from .common.config_manager import ConfigManager
 from .common.event_manager import event_manager
-from .services.browser_manager import BrowserManager  # 修正：移动到 services 目录
+from .services.browser_manager import BrowserManager
 from .core.job_filter import JobFilter
 from .core.job_analyzer import JobAnalyzer
 from .services.ws_client.client import WsClient
 from .services.zhipin_api import zhipin_api
-from .common.db_manager import DatabaseManager # 修正导入
+from .common.db_manager import DatabaseManager
 
-# --- 日志配置 ---
+# ... (LOGGING_CONFIG 不变) ...
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -48,10 +48,9 @@ LOGGING_CONFIG = {
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-# --- 修改点: 创建任务控制事件 ---
 stop_flag = asyncio.Event()
 pause_event = asyncio.Event()
-pause_event.set() # 初始设置为非暂停状态
+pause_event.set() 
 
 # --- 新增事件处理器 ---
 async def handle_stop_request(**kwargs):
@@ -66,10 +65,29 @@ async def handle_resume_request(**kwargs):
     logger.info("主程序收到继续任务请求，设置暂停事件（将解除阻塞）。")
     pause_event.set()
 
+# **新增: 配置重载处理器**
+async def handle_config_reload(**kwargs):
+    """
+    处理配置重载事件，重新初始化需要更新的模块。
+    """
+    logger.info("主程序收到配置重载请求，将重新初始化相关模块...")
+    try:
+        config = ConfigManager.get_config()
+        # 重新初始化 ZhipinApi 的速率限制器
+        zhipin_api.reinitialize_config()
+        
+        # 可以在这里添加更多模块的重载逻辑
+        # 例如: job_filter = JobFilter(config)
+        # job_analyzer = JobAnalyzer(config)
+        
+        logger.info("模块重载完成。")
+    except Exception as e:
+        logger.error(f"重载配置并重新初始化模块时出错: {e}", exc_info=True)
+
 
 async def main():
     try:
-        ConfigManager.load_config()
+        # **修改: 调用 get_config 会自动处理加载逻辑**
         config = ConfigManager.get_config()
         zhipin_api.reinitialize_config()
     except (FileNotFoundError, ValueError) as e:
@@ -78,7 +96,6 @@ async def main():
 
     logger.info("开始初始化所有模块...")
     db_manager = DatabaseManager(config.database.filename)
-    # --- 修改点: 传递 pause_event ---
     browser_manager = BrowserManager(config, stop_flag, pause_event)
     job_filter = JobFilter(config)
     job_analyzer = JobAnalyzer(config)
@@ -90,9 +107,7 @@ async def main():
     # --- 核心流程事件 ---
     event_manager.subscribe("cookies_updated", zhipin_api.handle_session_update)
     event_manager.subscribe("cookies_updated", ws_client._handle_cookies_updated)
-    
     event_manager.subscribe("fetch_jobs_requested", browser_manager.start_fetching_jobs)
-    
     event_manager.subscribe("job_list_found", job_analyzer.fetch_job_details)
     event_manager.subscribe("job_details_fetched", job_filter.pre_filter_jobs)
     event_manager.subscribe("job_details_fetched", db_manager.save_initial_jobs)
@@ -104,11 +119,13 @@ async def main():
     event_manager.subscribe("apply_to_job", ws_client.handle_application) 
     event_manager.subscribe("application_sent_successfully", db_manager.update_job_status_applied)
     
-    # --- 修改点: 注册新的任务控制事件 ---
+    # --- 任务控制事件 ---
     event_manager.subscribe("stop_fetch_requested", handle_stop_request)
     event_manager.subscribe("pause_fetch_requested", handle_pause_request)
     event_manager.subscribe("resume_fetch_requested", handle_resume_request)
-    
+    # **新增: 订阅配置重载事件**
+    event_manager.subscribe("config_reloaded", handle_config_reload)
+
     # --- 关闭流程事件 ---
     event_manager.subscribe("shutdown", browser_manager.close)
     event_manager.subscribe("shutdown", ws_client.close)
@@ -126,7 +143,6 @@ async def main():
 
         if login_successful:
             logger.info("登录成功，程序进入待命状态。请在GUI界面操作。")
-            # --- 新增: 发布登录成功事件 ---
             await event_manager.publish("login_successful")
             await stop_flag.wait()
         else:
@@ -140,9 +156,7 @@ async def main():
         if not stop_flag.is_set():
             stop_flag.set()
         
-        # 确保发布shutdown事件
         if event_manager._listeners.get("shutdown"):
-            # 在新的事件循环中运行关闭事件，以防主循环已停止
             shutdown_loop = asyncio.new_event_loop()
             try:
                 shutdown_loop.run_until_complete(event_manager.publish("shutdown"))

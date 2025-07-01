@@ -111,8 +111,8 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-        # --- 修复: 在所有UI组件创建完成后设置主题 ---
-        self.set_dark_theme()
+        # # --- 修复: 在所有UI组件创建完成后设置主题 ---
+        # self.set_dark_theme()
 
         # 初始化后台线程和通信
         self.asyncio_thread = AsyncioThread()

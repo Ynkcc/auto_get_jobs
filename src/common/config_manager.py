@@ -1,29 +1,38 @@
-# config_manager.py
-from pydantic import BaseModel, ValidationError
+# src/common/config_manager.py
+from pydantic import BaseModel, ValidationError, Field
 from typing import Dict, Any, List, Optional
 import yaml
 import os
+import shutil
 
-class playwrightConfig(BaseModel):
+class PlaywrightConfig(BaseModel):
     browser_type: str
     custom_browser_path: str
     headless: bool
     use_default_data_dir: bool
-    scroll_pages: int = 3  # 默认滚动3页
+    scroll_pages: int = 3
 
-class AiConfig(BaseModel):
+# 修改点4: 新增AI Provider模型
+class AiProvider(BaseModel):
+    id: str
+    name: str
     api_url: str
     api_key: str
     model: str
     temperature: float
     provider: str
-    api_version: Optional[str] = None  # 为 Azure 添加 api_version
-    resume_for_ai_file: str
+    api_version: Optional[str] = None
+
+# 修改点4: 修改AIConfig模型
+class AiConfig(BaseModel):
+    active_ai_id: str
+    providers: List[AiProvider]
     prompt: str
     job_requirements_prompt: str
+    resume_for_ai_file: str
 
 class CrawlerConfig(BaseModel):
-    playwright: playwrightConfig
+    playwright: PlaywrightConfig
     rate_limit: Dict[str, float]
     next_page_delay: int
     request_timeout: int
@@ -32,12 +41,13 @@ class CrawlerConfig(BaseModel):
 class GreetingConfig(BaseModel):
     enable_ai: bool
     greeting_prompt: str
+    greeting_for_ai_file: str # 新增未实现字段
 
 class ApplicationConfig(BaseModel):
     send_resume_image: bool
     resume_image_file: str
     greeting: GreetingConfig
-    resume_name: str
+    resume_name: str # 新增未实现字段
 
 class LoggingConfig(BaseModel):
     level: str
@@ -53,13 +63,12 @@ class FilterBaseConfig(BaseModel):
     values: List[str]
     combine: bool
 
-# 新增 CityConfig 模型
 class CityConfig(BaseModel):
     values: List[str]
-    expand_to_district: bool # 是否展开到地区
+    expand_to_district: bool
 
 class JobSearchConfig(BaseModel):
-    city: CityConfig # 修改 city 字段类型
+    city: CityConfig
     query: List[str]
     areas: Dict[str, List[str]]
     degree: FilterBaseConfig
@@ -73,9 +82,8 @@ class JobSearchConfig(BaseModel):
 
 class AccountConfig(BaseModel):
     username: str
-    login_data_file: str = "data/account1.json"  # 默认登录数据文件路径
+    login_data_file: str = "data/account1.json"
 
-# 新增 ExcludeKeywordsConfig 模型，用于定义排除关键字
 class ExcludeKeywordsConfig(BaseModel):
     company_name: List[str]
     job_description: List[str]
@@ -88,8 +96,7 @@ class JobCheckConfig(BaseModel):
     min_insured: int
     exclude_outsource: bool
     check_visited: bool
-    # 新增 exclude_keywords 字段以支持按关键字过滤
-    exclude_keywords: Optional[ExcludeKeywordsConfig]
+    exclude_keywords: Optional[ExcludeKeywordsConfig] = None
 
 class EmailConfig(BaseModel):
     enabled: bool
@@ -121,10 +128,12 @@ class AppConfig(BaseModel):
     job_check: JobCheckConfig
     notification: NotificationConfig
     ws_client: WsClientConfig
-
+    
 class ConfigManager:
     _instance = None
-    config: AppConfig = None
+    config: Optional[AppConfig] = None
+    _config_path: str = "config/config.yaml"
+    _sample_config_path: str = "config/config_sample.yaml"
 
     def __new__(cls):
         if cls._instance is None:
@@ -133,8 +142,16 @@ class ConfigManager:
 
     @classmethod
     def load_config(cls, config_path: str = "config/config.yaml"):
+        cls._config_path = config_path
+        
         if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+            print(f"警告: 配置文件 {config_path} 不存在。")
+            if os.path.exists(cls._sample_config_path):
+                print(f"正在从 {cls._sample_config_path} 创建默认配置文件...")
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                shutil.copy(cls._sample_config_path, config_path)
+            else:
+                raise FileNotFoundError(f"错误: 配置文件 {config_path} 和模板文件 {cls._sample_config_path} 都不存在。")
 
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = yaml.safe_load(f)
@@ -142,18 +159,15 @@ class ConfigManager:
         try:
             cls.config = AppConfig(**config_data)
         except ValidationError as e:
-            error_messages = []
-            for error in e.errors():
-                loc = "->".join(str(loc) for loc in error['loc'])
-                msg = f"{loc}: {error['msg']}"
-                error_messages.append(msg)
-            error_messages_str='\n'.join(error_messages)
-            raise ValueError(
-                f"配置验证错误:\n{error_messages_str}"
-            ) from e
+            error_messages = [f"{'->'.join(map(str, error['loc']))}: {error['msg']}" for error in e.errors()]
+            raise ValueError(f"配置验证错误:\n{os.linesep.join(error_messages)}") from e
 
     @classmethod
     def get_config(cls) -> AppConfig:
         if cls.config is None:
-            raise RuntimeError("配置尚未加载，请先调用load_config方法")
+            cls.load_config()
         return cls.config
+
+    @classmethod
+    def get_config_path(cls) -> str:
+        return cls._config_path
