@@ -4,35 +4,21 @@
 ## 项目简介
 boss直聘自动投递，ai根据要求进行筛选
 
-## 使用说明
-1. 下载[release](https://github.com/Ynkcc/auto_get_jobs/releases) 中对应系统的压缩包，解压
+## 开发指南
 
-2. 修改`config`目录下的`config.yaml`
-
-3. 将`resume_for_ai.md`、`resume.png`,改成你的简历文字说明，简历图片
-
-4. 打开控制台,运行 main 程序
-
- >如果你使用python脚本直接运行。
- >
- >请安装好依赖库后，执行`/src/ws_client/patch.py`
-
+1. 本分支，已完成 基于事件驱动进行重构
+2. 配置文件的gui页面，尚未完全完成。可以先将`config`目录下的`config_sample.yaml`重命名为`config.yaml`,修改配置文件
+3. requirements.txt 的依赖可能不全
+4. 将`resume_for_ai.md`、`resume.png`,改成你的简历文字说明，简历图片
+5. 使用以下命令启动程序 `python -m src.gui.main_window`
+6. 我使用vscode对本项目进行开发，如果你使用pycharm可能出现问题
+7. 项目内文档部分过时，具体以代码为准
 可以使用以下插件 [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) 查看保存的数据库`jobs.db`
 
 ---
-计划做一个用户界面，但是涉及大量重构。估计会鸽。
-
-项目内文档部分过时，具体以代码为准
-
 如果你在使用中遇到困难，可以前往交流群 `487194990`寻求帮助
 
-欢迎为本项目做贡献。欢迎PR。佛性维护，欢迎接手。
-
----
-
-ai模型提供商可以考虑使用azure，学生每年赠送100$。
-
-而且deepseek-r1模型响应也快
+长期停更，欢迎接手。
 
 ---
 #### 项目计划
@@ -60,18 +46,16 @@ ai模型提供商可以考虑使用azure，学生每年赠送100$。
   - `tests`目录包含脚本
 - [x] 完善一下文档
   - 逐步完善中
+- [x] 添加一个gui页面
 
 **计划中** (按优先级排序)
-- [ ] 使用qt创建一个图形化界面
 - [ ] 优化一下导出的excel的格式
 - [ ] 使用重试队列，解决MQTT客户端会漏消息的问题
 - [ ] 支持pdf发送简历
   - 即自动将pdf转成图片后再发送
 - [ ] 对于同一公司的相似岗位，不重复投递
 - [ ] 响应hr简历请求
-- [ ] 将现有的工作详情查询和岗位沟通的接口操作改成playwright的模拟操作
-- [ ] 令牌桶管理所有与boss直聘通信的http请求
-  - 把请求塞到playwright里，然后通过playwright提供的route方法拿令牌桶限速
+- [ ] 将现有的工作详情查询和岗位沟通的接口操作改成playwright的模拟操作，异步编程在新窗口处理
 - [ ] 到达投递上限后自动切号
 - [ ] 让ai生成搜索关键词，扩展可接受岗位
 - [ ] 数据库数据共享
