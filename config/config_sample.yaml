@@ -1,58 +1,55 @@
 # config.yaml
 
+# =============== AI 配置 ===============
+ai:
+  active_ai_id: qwen
+  providers:
+  - id: qwen
+    name: 阿里云_通义千问
+    api_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key: sk-xxx  # 请替换为实际的API密钥
+    model: qwen-plus
+    temperature: 0.2
+    provider_type: openai
+    api_version: null
+  - id: azure_example
+    name: Azure OpenAI
+    api_url: https://your-azure-endpoint.openai.azure.com/
+    api_key: azure-key  # 请替换为实际的API密钥
+    model: gpt-4
+    temperature: 0.2
+    provider_type: azure
+    api_version: '2024-10-21'
+  prompt: |
+    请根据下面提供的岗位要求、用户简历和用户偏好，判断这个岗位是否适合用户。
+    你的分析需要全面且严谨，并以结构化的方式返回结论和原因。
+  job_requirements_prompt: |
+    我想要找一份IT行业的工作，偏技术性的岗位，不要体力活，或者到处跑。
+    不考虑售后、售前、外包或教育行业。接受项目制或者兼职、实习形式的工作。
+    排除Java岗位。
+  resume_for_ai_file: data/resume_for_ai.md
+
 # =============== 爬虫配置 ===============
 crawler:
   playwright:
     browser_type: chrome  # 浏览器类型选项（chromium/firefox/webkit/chrome/edge）
-    custom_browser_path: ""  # custom指基于chromium，支持CDP调用的浏览器路径
+    custom_browser_path: ''  # custom指基于chromium，支持CDP调用的浏览器路径
     headless: false
-    use_default_data_dir: false # 使用默认的用户配置文件目录，不建议非开发者打开
-    scroll_pages: 3 # 默认滚动3页
-  rate_limit:        # 请求速率限制（次/秒）仅对boss直聘的请求生效
-    rate: 1
-  next_page_delay: 30 # 翻页延迟（秒）
-  request_timeout: 30 # 请求超时时间（秒）
-  page_load_timeout: 60 # 页面加载超时时间（秒）
-
-# =============== AI 配置 ===============
-ai:
-  active_ai_id: "qwen" # 当前激活的AI配置ID
-  providers:
-    - id: "qwen"
-      name: "阿里云_通义千问"
-      provider: "openai"   # 服务商，openai代表openai兼容接口
-      model: "qwen-plus"
-      temperature: 0.2
-      api_key: "sk-xxx"
-      api_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      # api_url: "https://zhenze-huhehaote.cmecloud.cn/inference-api/exp-api/inf-1336781912337387520/v1"  
-      # api_url: "https://gemini.241098.xyz/v1"
-
-    - id: "azure_example"
-      name: "Azure OpenAI"
-      provider: "azure"
-      model: "gpt-4"
-      temperature: 0.2
-      api_key: "azure-key"
-      api_url: "https://your-azure-endpoint.openai.azure.com/"
-      api_version: "2024-10-21"
-
-  prompt: |  # AI分析提示词
-    请根据下面提供的岗位要求、用户简历和用户偏好，判断这个岗位是否适合用户。
-    你的分析需要全面且严谨，并以结构化的方式返回结论和原因。
-  job_requirements_prompt: | # 用户求职偏好
-    我想要找一份IT行业的工作，偏技术性的岗位，不要体力活，或者到处跑。
-    不考虑售后、售前、外包或教育行业。接受项目制或者兼职、实习形式的工作。
-    排除Java岗位。
-  resume_for_ai_file: "data/resume_for_ai.md"  # 用户简历文件路径
+    use_default_data_dir: false  # 使用默认的用户配置文件目录，不建议非开发者打开
+    scroll_pages: 3  # 默认滚动3页
+  rate_limit:  # 请求速率限制（次/分钟）仅对boss直聘的请求生效
+    rate: 2.0
+  next_page_delay: 30  # 翻页延迟（秒）
+  request_timeout: 30  # 请求超时时间（秒）
+  page_load_timeout: 60  # 页面加载超时时间（秒）
 
 # =============== 申请配置 ===============
 application:
   send_resume_image: true
-  resume_image_file: "data/resume.png"
+  resume_image_file: data/resume.png
   greeting:
     enable_ai: true  # 是否使用AI生成招呼语
-    greeting_prompt: | # 打招呼语提示词
+    greeting_prompt: |
       你是一个专业的求职辅助AI，请严格遵循以下规则生成打招呼语：
       1. 基于用户简历的【真实经历】和【实际技能】，禁止任何虚构或夸张
       2. 保持谦逊得体的口语表达，避免过度自我吹嘘
@@ -63,95 +60,106 @@ application:
       7. 仅提及与岗位描述相关的优势
       8. 示例参考：
       "您好，我对[岗位名称]感兴趣，我的[相关经验/技能]与该岗位要求较为契合。[简明列举1-2个真实匹配点]。如果合适希望能进一步沟通。"
-    # (未实现) 供ai参考的用户招呼语历史，以生成风格类似的招呼语
-    greeting_for_ai_file: "data/greeting_for_ai.md"
-  # (未实现) hr请求简历时的，发送的简历名称
-  resume_name: "resume.pdf"
+    greeting_for_ai_file: data/greeting_for_ai.md
+  resume_name: resume.pdf
 
 # =============== 日志配置 ===============
 logging:
-  level: INFO      # 日志级别（DEBUG/INFO/WARNING/ERROR）
-  path: data/app.log    # 日志文件路径
-  max_size: 10     # 日志文件最大大小（MB）
+  level: INFO  # 日志级别（DEBUG/INFO/WARNING/ERROR）
+  path: data/app.log  # 日志文件路径
+  max_size: 10  # 日志文件最大大小（MB）
 
 # =============== 数据库配置 ===============
 database:
-  filename: "data/jobs.db"
-  # 在一次正常运行完成后，触发导出
-  export_excel: true
-  excel_path: "data"   #导出目录路径
+  filename: data/jobs.db
+  export_excel: true  # 在一次正常运行完成后，触发导出
+  excel_path: data  # 导出目录路径
 
 # =============== 岗位搜索配置 ===============
 job_search:
   city:
-    values: ["海口","文昌"]
+    values:
+    - 海口
+    - 文昌
     expand_to_district: false
-  query: ["桌面运维"]
+  query:
+  - 桌面运维
+  - 运维
   areas: {}
-  degree:
-    values: []
-    combine: false
   experience:
-    values: ["1-3年","经验不限"]
+    values:
+    - 0
     combine: true
-  position:
-    values: []
+  degree:
+    values:
+    - 0
     combine: false
-  industry:
-    values: []
-    combine: false
-  salary: []
-  jobType: []
+  salary:
+    values:
+    - 0
+    combine: true
   scale:
-    values: []
+    values:
+    - 0
     combine: false
   stage:
-    values: []
+    values:
+    - 0
     combine: false
+  jobType:
+    values:
+    - 0
+    combine: true
+  position: []
+  industry: []
 
 # =============== 账号配置 ===============
 accounts:
-  - username: "account1"
-    login_data_file: "data/account1.json"
+- username: account1
+  login_data_file: data/account1.json
 
 # =============== 岗位筛选配置 ===============
 job_check:
   test_mode: true
-  salary_range: [1.1, 11]
+  salary_range:
+  - 1.1
+  - 11.0
   inactive_status:
-    - 本月活跃
-    - 2月内活跃
-    - 3月内活跃
-    - 4月内活跃
-    - 5月内活跃
-    - 半年前活跃
-    - 近半年活跃
-  # (未实现) 是否检查社保人数
-  check_insurance: true
-  # (未实现) 最小参保人数
-  min_insured: 10
-  # (未实现) 排除外包公司
-  exclude_outsource: true
+  - 本月活跃
+  - 2月内活跃
+  - 3月内活跃
+  - 4月内活跃
+  - 5月内活跃
+  - 半年前活跃
+  - 近半年活跃
+  check_insurance: false  # 是否检查社保人数
+  min_insured: 9  # 最小参保人数
+  exclude_outsource: false  # 排除外包公司
   check_visited: false
   exclude_keywords:
-    company_name: ["人力"]
-    job_description: ["销售", "客服"]
+    company_name:
+    - 科技
+    - qqq
+    job_description:
+    - 实习
+    - 兼职
+    - 销售
+    - 客服
 
 # =============== 通知配置 ===============
 notification:
-  # (未实现)
   email:
     enabled: false
-    smtp_server: "smtp.example.com"
-    username: "user@example.com"
-    password: "password123"
-    receivers: ["receiver@example.com"]
-  # (未实现)
+    smtp_server: smtp.example.com
+    username: user@example.com
+    password: password123
+    receivers:
+    - receiver@example.com
   webhook:
     enabled: false
-    url: "https://api.example.com/webhook"
+    url: https://api.example.com/webhook
 
 # =============== WebSocket 客户端配置 ===============
 ws_client:
-  host: "ws6.zhipin.com"
+  host: ws6.zhipin.com
   port: 443

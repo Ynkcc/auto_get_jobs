@@ -293,8 +293,9 @@ class ZhipinApi:
         try:
             config = ConfigManager.get_config()
             rate_limit_config = config.crawler.rate_limit
-            self._limiter = AsyncLimiter(rate_limit_config['rate'], 1)
-            logger.info(f"ZhipinApi 限速器已根据配置更新: 速率 {rate_limit_config['rate']} req/s")
+
+            self._limiter = AsyncLimiter(rate_limit_config.rate, 60)
+            logger.info(f"ZhipinApi 限速器已根据配置更新: 速率 {rate_limit_config.rate} req/min")
         except RuntimeError as e:
             logger.warning(f"重新初始化ZhipinApi配置失败，将继续使用默认限速器: {e}")
 

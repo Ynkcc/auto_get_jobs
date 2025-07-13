@@ -35,26 +35,29 @@ class AiAnalyzer:
         base_client = self._initialize_client()
         self.client = instructor.patch(base_client, mode=instructor.Mode.JSON)
 
-    def _initialize_client(self):
-        """根据激活的 provider 配置初始化客户端"""
-        provider_type = self.active_provider.provider
+    def _initialize_client(self, provider: AiProvider = None):
+        """根据指定的 provider 或激活的 provider 配置初始化客户端"""
+        provider_to_use = provider or self.active_provider
+        
+        provider_type = provider_to_use.provider_type
         if provider_type == "azure":
-            if not self.active_provider.api_version:
+            if not provider_to_use.api_version:
                 raise ValueError("使用 Azure AI 服务时，必须在配置中指定 'api_version'")
             return AsyncAzureOpenAI(
-                api_key=self.active_provider.api_key,
-                azure_endpoint=self.active_provider.api_url,
-                api_version=self.active_provider.api_version,
+                api_key=provider_to_use.api_key,
+                azure_endpoint=provider_to_use.api_url,
+                api_version=provider_to_use.api_version,
                 max_retries=3,
             )
         elif provider_type == "openai":
             return AsyncOpenAI(
-                api_key=self.active_provider.api_key,
-                base_url=self.active_provider.api_url,
+                api_key=provider_to_use.api_key,
+                base_url=provider_to_use.api_url,
                 max_retries=3,
             )
         else:
             raise ValueError(f"不支持的AI提供商: {provider_type}")
+
 
     def _load_user_requirements(self, file_name):
         try:
@@ -63,6 +66,33 @@ class AiAnalyzer:
         except FileNotFoundError:
             logger.warning(f"未找到用于AI分析的简历文件 {file_name}")
             return ""
+
+    async def test_provider(self, provider: AiProvider) -> (bool, str):
+        """
+        测试指定的AI服务商配置是否可用。
+        返回一个元组 (是否成功, 消息)
+        """
+        try:
+            test_client = self._initialize_client(provider)
+            patched_client = instructor.patch(test_client, mode=instructor.Mode.JSON)
+            
+            logger.info(f"正在测试服务商: {provider.name}")
+            payload = {
+                "model": provider.model,
+                "messages": [{"role": "user", "content": "hello"}],
+                "temperature": 0.1,
+                "max_tokens": 5,
+            }
+            await patched_client.chat.completions.create(**payload)
+            await test_client.close()
+            logger.info(f"服务商 '{provider.name}' 测试成功。")
+            return True, "连接成功！"
+        except OpenAIError as e:
+            logger.error(f"测试服务商 '{provider.name}' 失败 (OpenAIError): {e}")
+            return False, f"API错误: {e.body.get('message') if e.body else str(e)}"
+        except Exception as e:
+            logger.error(f"测试服务商 '{provider.name}' 时发生未知错误: {e}")
+            return False, f"未知错误: {str(e)}"
 
     async def ai_greeting(self, job_detail):
         payload = {
@@ -112,5 +142,7 @@ class AiAnalyzer:
         
     async def close(self):
         if hasattr(self, 'client') and self.client:
-            await self.client.close()
+            # AsyncOpenAI 使用 close() 方法，不是 aclose()
+            if hasattr(self.client, 'close'):
+                await self.client.close()
             logger.info("AiAnalyzer 客户端会话已关闭")

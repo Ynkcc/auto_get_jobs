@@ -57,9 +57,8 @@ def export_to_xlsx(jobs_data: List[Dict], filename="filtered_jobs.xlsx"):
 def build_search_url(job_search) -> List[str]:
     """
     根据配置构造搜索URL。
-    (从旧版 general.py 迁移而来)
+    此版本处理来自多选框的编码列表。
     """
-    # 假设 search_params_config.json 在 config/ 目录下
     config_path = os.path.join('config', 'search_params_config.json')
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -100,30 +99,67 @@ def build_search_url(job_search) -> List[str]:
 
     base_url = "https://www.zhipin.com/web/geek/job"
 
-    def process_filter(filter_config, param_map: dict) -> List[str]:
-        codes = [str(param_map.get(v)) for v in filter_config.values]
-        return [','.join(c for c in codes if c)] if filter_config.combine and codes else [c for c in codes if c]
+    def process_filter_config(filter_config) -> List[str]:
+        """处理包含values和combine字段的过滤配置"""
+        if hasattr(filter_config, 'values') and hasattr(filter_config, 'combine'):
+            # 新的配置结构
+            values = filter_config.values
+            combine = filter_config.combine
+        elif hasattr(filter_config, 'model_dump'):
+            # Pydantic模型
+            config_dict = filter_config.model_dump()
+            values = config_dict.get('values', [])
+            combine = config_dict.get('combine', True)
+        elif isinstance(filter_config, dict):
+            # 字典格式
+            values = filter_config.get('values', [])
+            combine = filter_config.get('combine', True)
+        else:
+            # 兼容旧格式（直接是列表）
+            values = filter_config if isinstance(filter_config, list) else []
+            combine = True
+        
+        codes = [str(v) for v in values if v != 0]  # 排除默认的0值
+        if not codes:
+            return []
+        return [','.join(codes)] if combine and codes else codes
 
+    # 构建参数配置
     params_config = {
-        'degree': process_filter(job_search.degree, params_data.get("degree", {})),
-        'experience': process_filter(job_search.experience, params_data.get("experience", {})),
-        'scale': process_filter(job_search.scale, params_data.get("scale", {})),
-        'stage': process_filter(job_search.stage, params_data.get("stage", {})),
-        'salary': [str(params_data.get("salary", {}).get(v)) for v in job_search.salary],
-        'query': job_search.query
+        'degree': process_filter_config(job_search.degree),
+        'experience': process_filter_config(job_search.experience),
+        'scale': process_filter_config(job_search.scale),
+        'stage': process_filter_config(job_search.stage),
+        'salary': process_filter_config(job_search.salary),
+        'jobType': process_filter_config(job_search.jobType),
+        'query': job_search.query,
+        'position': [','.join(job_search.position)] if job_search.position else [],
+        'industry': [','.join(job_search.industry)] if job_search.industry else [],
     }
-    params_config = {k: v for k, v in params_config.items() if any(v)}
+
+    # 清理掉值为空的参数
+    params_config = {k: v for k, v in params_config.items() if v and any(v)}
 
     base_params_list = []
     for city_code, districts in location_dicts.items():
         if not districts:
             base_params_list.append({'city': city_code})
             continue
+        # BOSS直聘目前网页版似乎使用 businessDistrict 而非 multiBusinessDistrict
+        # 为保持兼容性，我们使用 businessDistrict
         for district_code in districts:
             base_params_list.append({'city': city_code, 'businessDistrict': district_code})
 
     url_list = []
+    # 如果没有额外的筛选参数，直接返回基于地理位置的URL
+    if not params_config:
+        for params in base_params_list:
+            param_str = urlencode(params)
+            url_list.append(f"{base_url}?{param_str}")
+        return url_list
+
     param_keys = list(params_config.keys())
+    # 从配置中获取值的组合
     param_combinations = list(itertools.product(*params_config.values()))
 
     for base_param in base_params_list:
@@ -133,13 +169,11 @@ def build_search_url(job_search) -> List[str]:
             param_str = urlencode(merged_params)
             url_list.append(f"{base_url}?{param_str}")
 
-    return url_list if url_list else [f"{base_url}?{urlencode(p)}" for p in base_params_list]
-
+    return url_list
 
 def calculate_md5(file_path: str) -> str:
     """
     计算文件的 MD5 哈希值。
-    (从旧版 general.py 迁移而来)
     """
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as f:
@@ -150,12 +184,10 @@ def calculate_md5(file_path: str) -> str:
 def filter_jobs_by_salary(jobs: List[Dict], min_expected_salary: float, max_expected_salary: float) -> List[Dict]:
     """
     根据期望薪资范围过滤岗位。
-    (从旧版 general.py 迁移而来)
     """
     jobs_matching_salary = []
 
     for job in jobs:
-        # 移除了job_card的提取，因为新的job结构是扁平的
         job_name = job.get('jobName', '未知职位')
         job_salary = job.get('salaryDesc', '')
         if not job_salary:

@@ -1,6 +1,6 @@
 __pycache__
 driver/*.exe
-config/config.yaml
+config
 data/*
 src/ws_client/protoc.exe
 *.log
