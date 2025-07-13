@@ -48,6 +48,11 @@ jobs:
           if ${{ matrix.include_browser }}; then 
           playwright install chromium
           fi
+          # 安装GUI相关的系统依赖 (Linux)
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xfixes0
+          fi
 
       - name: Detect Chromium Version
         if: ${{ matrix.include_browser }}
@@ -108,9 +113,11 @@ jobs:
         uses: Ynkcc/Nuitka-Action@main
         with:
           nuitka-version: main
-          script-name: src/main.py
+          script-name: gui_main.py
           mode: onefile
           mingw64: true
+          enable-plugins: pyside6
+          include-data-dirs: data=data;config=config
           playwright-include-browser: ${{ matrix.include_browser && env.CHROMIUM_VERSION || 'none' }}
 
       - name: Prepare Resources
@@ -121,9 +128,9 @@ jobs:
           dir_name="${os_short}${{ matrix.include_browser && '-chromium' || '' }}"
           mkdir -p "output/$dir_name"
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            mv build/main.bin "output/$dir_name/main"
+            mv build/gui_main.bin "output/$dir_name/gui_main"
           else
-            mv build/main.exe "output/$dir_name/"
+            mv build/gui_main.exe "output/$dir_name/"
           fi
           mv data/resume_sample.png data/resume.png
           mv data/resume_for_ai_sample.md data/resume_for_ai.md 
