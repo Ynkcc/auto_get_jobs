@@ -5,6 +5,17 @@ on:
     # branches: [ main ]
     tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: '是否创建 Release（仅在手动运行时有效）'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release 标签名称（如果创建 Release）'
+        required: false
+        default: 'manual-release'
+        type: string
 
 jobs:
   build:
@@ -38,8 +49,60 @@ jobs:
           playwright install chromium
           fi
 
-      - name: Patch paho-mqtt
-        run: python src/ws_client/patch.py
+      - name: Detect Chromium Version
+        if: ${{ matrix.include_browser }}
+        shell: bash
+        run: |
+          # 检测 Playwright 安装的 Chromium 版本
+          echo "Detecting Chromium version..."
+          
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            # Linux 系统 - 检查多个可能的路径
+            PLAYWRIGHT_CACHE_DIRS=(
+              "$HOME/.cache/ms-playwright"
+              "$HOME/.cache/playwright"
+            )
+            
+            CHROMIUM_VERSION=""
+            for cache_dir in "${PLAYWRIGHT_CACHE_DIRS[@]}"; do
+              if [[ -d "$cache_dir" ]]; then
+                CHROMIUM_DIR=$(find "$cache_dir" -name "chromium-*" -type d | head -1)
+                if [[ -n "$CHROMIUM_DIR" ]]; then
+                  CHROMIUM_VERSION=$(basename "$CHROMIUM_DIR")
+                  echo "Found Chromium in $cache_dir: $CHROMIUM_VERSION"
+                  break
+                fi
+              fi
+            done
+          else
+            # Windows 系统 - 检查多个可能的路径
+            PLAYWRIGHT_CACHE_DIRS=(
+              "$USERPROFILE/AppData/Local/ms-playwright"
+              "$USERPROFILE/.cache/ms-playwright"
+              "$LOCALAPPDATA/ms-playwright"
+            )
+            
+            CHROMIUM_VERSION=""
+            for cache_dir in "${PLAYWRIGHT_CACHE_DIRS[@]}"; do
+              if [[ -d "$cache_dir" ]]; then
+                CHROMIUM_DIR=$(find "$cache_dir" -name "chromium-*" -type d 2>/dev/null | head -1)
+                if [[ -n "$CHROMIUM_DIR" ]]; then
+                  CHROMIUM_VERSION=$(basename "$CHROMIUM_DIR")
+                  echo "Found Chromium in $cache_dir: $CHROMIUM_VERSION"
+                  break
+                fi
+              fi
+            done
+          fi
+          
+          # 如果没有找到特定版本，使用默认值
+          if [[ -z "$CHROMIUM_VERSION" ]]; then
+            echo "Chromium version not detected, using default 'chromium'"
+            CHROMIUM_VERSION="chromium"
+          fi
+          
+          echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
+          echo "Will use Chromium version: $CHROMIUM_VERSION"
 
       - name: Build Executable with Nuitka
         uses: Ynkcc/Nuitka-Action@main
@@ -48,7 +111,7 @@ jobs:
           script-name: src/main.py
           mode: onefile
           mingw64: true
-          playwright-include-browser: ${{ matrix.include_browser && 'chromium-1169' || 'none' }}
+          playwright-include-browser: ${{ matrix.include_browser && env.CHROMIUM_VERSION || 'none' }}
 
       - name: Prepare Resources
         shell: bash
@@ -78,7 +141,7 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
     runs-on: ubuntu-latest
     
     steps:
@@ -94,14 +157,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name != '' && github.ref_name || inputs.release_tag }}
+          name: Release ${{ github.ref_name != '' && github.ref_name || inputs.release_tag }}
           body: |
-            Automated build for version ${{ github.ref_name }}
+            ${{ github.event_name == 'workflow_dispatch' && 'Manual build' || 'Automated build' }} for version ${{ github.ref_name != '' && github.ref_name || inputs.release_tag }}
             - Includes Windows and Linux builds
             - Variants with/without Chromium browser
           files: artifacts/*
           draft: false
-          prerelease: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
