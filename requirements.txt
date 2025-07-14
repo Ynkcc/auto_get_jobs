@@ -15,4 +15,4 @@ pydantic
 httpx[socks]
 instructor
 aiolimiter
-PySide6-Fluent-Widgets[full]
+pyside6

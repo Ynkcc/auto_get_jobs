@@ -2,11 +2,9 @@
 from typing import List, Dict, Any
 
 from PySide6.QtCore import Qt, Signal, QPoint
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtGui import QMouseEvent, QIcon
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QDialog,
                                QListWidget, QListWidgetItem, QCheckBox, QHBoxLayout)
-
-from qfluentwidgets import ComboBox, FluentIcon, CheckBox as FluentCheckBox
 
 class MultiSelectComboBox(QPushButton):
     """
@@ -27,7 +25,8 @@ class MultiSelectComboBox(QPushButton):
         self.items = items
         self.selected_codes = selected_codes if selected_codes is not None else []
 
-        self.setIcon(FluentIcon.FILTER.icon())
+        # 设置一个简单的过滤图标或者不设置图标
+        self.setText("选择项目")
         self._update_button_text()
 
         self.clicked.connect(self._show_popup)
@@ -126,7 +125,7 @@ class MultiSelectWithCombineWidget(QWidget):
         layout.addWidget(self.multi_select)
         
         # 合并选项复选框
-        self.combine_checkbox = FluentCheckBox("合并为单次请求")
+        self.combine_checkbox = QCheckBox("合并为单次请求")
         self.combine_checkbox.setChecked(self.current_config.get("combine", True))
         self.combine_checkbox.toggled.connect(self._on_combine_changed)
         layout.addWidget(self.combine_checkbox)

@@ -8,12 +8,12 @@ from typing import Any, List, Dict, Optional, Type
 
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QScrollArea, QFrame, QGroupBox, QDialog, QStackedWidget,
-                               QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout)
+                               QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
+                               QLabel, QLineEdit, QCheckBox, QComboBox, QTextEdit, 
+                               QSpinBox, QDoubleSpinBox, QPushButton, QTabWidget,
+                               QMessageBox, QStyle)
 from PySide6.QtCore import Qt, Signal
-from qfluentwidgets import (setTheme, Theme, SubtitleLabel, LineEdit, CheckBox, ComboBox,
-                            TextEdit, SpinBox, DoubleSpinBox, PushButton, FluentIcon,
-                            InfoBar, InfoBarPosition, StrongBodyLabel, BodyLabel,
-                            TableWidget, TabBar, Dialog)
+from PySide6.QtGui import QFont, QPalette, QColor
 
 import yaml
 
@@ -37,9 +37,9 @@ class ListEditWidget(QWidget):
 
         # 按钮布局
         button_layout = QHBoxLayout()
-        add_button = PushButton("添加", self, FluentIcon.ADD)
+        add_button = QPushButton("添加", self)
         add_button.clicked.connect(self.add_item)
-        self.remove_button = PushButton("删除", self, FluentIcon.DELETE)
+        self.remove_button = QPushButton("删除", self)
         self.remove_button.clicked.connect(self.remove_item)
         
         button_layout.addWidget(add_button)
@@ -121,32 +121,32 @@ class AiProviderDialog(QDialog):
             value = getattr(self.provider, field_name) if self.provider else field_info.default
             
             if field_name == "provider_type":
-                widget = ComboBox()
+                widget = QComboBox()
                 widget.addItems(["openai", "azure"])
                 widget.setCurrentText(str(value) if value is not None else "openai")
             elif field_info.annotation is bool:
-                widget = CheckBox()
+                widget = QCheckBox()
                 widget.setChecked(bool(value) if value is not None else False)
             elif field_info.annotation is int:
-                widget = SpinBox()
+                widget = QSpinBox()
                 widget.setValue(int(value) if value is not None and value != field_info.default else 0)
             elif field_info.annotation is float:
-                widget = DoubleSpinBox()
+                widget = QDoubleSpinBox()
                 widget.setValue(float(value) if value is not None and value != field_info.default else 0.0)
             else:
-                widget = LineEdit()
+                widget = QLineEdit()
                 widget.setText(str(value) if value is not None and value != field_info.default else '')
             
             self.widgets[field_name] = widget
-            form_layout.addRow(StrongBodyLabel(f"{field_info.description or field_name}:"), widget)
+            form_layout.addRow(QLabel(f"{field_info.description or field_name}:"), widget)
         
         layout.addLayout(form_layout)
         
         # 按钮布局
         button_layout = QHBoxLayout()
-        self.ok_button = PushButton("确定")
+        self.ok_button = QPushButton("确定")
         self.ok_button.clicked.connect(self.accept)
-        self.cancel_button = PushButton("取消")
+        self.cancel_button = QPushButton("取消")
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.ok_button)
         button_layout.addWidget(self.cancel_button)
@@ -156,15 +156,15 @@ class AiProviderDialog(QDialog):
         try:
             data_dict = {}
             for name, widget in self.widgets.items():
-                if isinstance(widget, (LineEdit, ComboBox)):
-                    data_dict[name] = widget.text() if isinstance(widget, LineEdit) else widget.currentText()
-                elif isinstance(widget, (SpinBox, DoubleSpinBox)):
+                if isinstance(widget, (QLineEdit, QComboBox)):
+                    data_dict[name] = widget.text() if isinstance(widget, QLineEdit) else widget.currentText()
+                elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                     data_dict[name] = widget.value()
-                elif isinstance(widget, CheckBox):
+                elif isinstance(widget, QCheckBox):
                     data_dict[name] = widget.isChecked()
             return AiProvider(**data_dict)
         except Exception as e:
-            InfoBar.error("错误", f"数据无效: {e}", duration=3000, parent=self)
+            QMessageBox.critical(self, "错误", f"数据无效: {e}")
             return None
 
 
@@ -181,13 +181,13 @@ class AiProvidersWidget(QWidget):
 
         # 按钮布局
         button_layout = QHBoxLayout()
-        add_button = PushButton("添加", self, FluentIcon.ADD)
+        add_button = QPushButton("添加", self)
         add_button.clicked.connect(self.add_provider)
-        self.edit_button = PushButton("编辑", self, FluentIcon.EDIT)
+        self.edit_button = QPushButton("编辑", self)
         self.edit_button.clicked.connect(self.edit_provider)
-        self.remove_button = PushButton("删除", self, FluentIcon.DELETE)
+        self.remove_button = QPushButton("删除", self)
         self.remove_button.clicked.connect(self.remove_provider)
-        self.test_button = PushButton("测试选中服务", self, FluentIcon.PLAY)
+        self.test_button = QPushButton("测试选中服务", self)
         self.test_button.clicked.connect(self.test_provider)
         
         button_layout.addWidget(add_button)
@@ -233,7 +233,7 @@ class AiProvidersWidget(QWidget):
             if new_provider:
                 # 检查ID是否唯一
                 if any(p.id == new_provider.id for p in self.providers):
-                    InfoBar.warning("警告", f"ID '{new_provider.id}' 已存在。", duration=3000, parent=self)
+                    QMessageBox.warning(self, "警告", f"ID '{new_provider.id}' 已存在。")
                     return
                 self.providers.append(new_provider)
                 self.refresh_table()
@@ -250,7 +250,7 @@ class AiProvidersWidget(QWidget):
             if updated_provider:
                 # 如果ID被修改，需要检查唯一性
                 if updated_provider.id != provider_to_edit.id and any(p.id == updated_provider.id for p in self.providers):
-                     InfoBar.warning("警告", f"ID '{updated_provider.id}' 已存在。", duration=3000, parent=self)
+                     QMessageBox.warning(self, "警告", f"ID '{updated_provider.id}' 已存在。")
                      return
                 self.providers[selected_row] = updated_provider
                 self.refresh_table()
@@ -277,9 +277,9 @@ class AiProvidersWidget(QWidget):
         async def run_test():
             success, message = await analyzer.test_provider(provider_to_test)
             if success:
-                InfoBar.success("测试成功", f"服务商 '{provider_to_test.name}': {message}", duration=3000, position=InfoBarPosition.TOP, parent=self.window())
+                QMessageBox.information(self.window(), "测试成功", f"服务商 '{provider_to_test.name}': {message}")
             else:
-                InfoBar.error("测试失败", f"服务商 '{provider_to_test.name}': {message}", duration=-1, position=InfoBarPosition.TOP, parent=self.window())
+                QMessageBox.critical(self.window(), "测试失败", f"服务商 '{provider_to_test.name}': {message}")
 
         # 在现有的事件循环中安全地运行
         loop = asyncio.get_event_loop()
@@ -306,16 +306,11 @@ class ConfigWindow(QDialog):
         self.widgets_map: Dict[str, QWidget] = {}
 
         main_layout = QVBoxLayout(self)
-        self.tab_widget = TabBar(self)
-        self.stacked_widget = QStackedWidget(self)
+        self.tab_widget = QTabWidget(self)
         
-        main_layout.addWidget(self.tab_widget)
-        main_layout.addWidget(self.stacked_widget, 1)
+        main_layout.addWidget(self.tab_widget, 1)
 
         self._create_tabs()
-        
-        # 连接标签切换
-        self.tab_widget.currentChanged.connect(self.stacked_widget.setCurrentIndex)
         
         self._create_buttons(main_layout)
 
@@ -357,8 +352,7 @@ class ConfigWindow(QDialog):
                 )
                 
                 scroll_area.setWidget(container)
-                self.stacked_widget.addWidget(scroll_area)
-                self.tab_widget.addTab(key, tab_name, None)
+                self.tab_widget.addTab(scroll_area, tab_name)
 
     def _generate_widgets_for_model(self, parent_layout: QVBoxLayout, model, base_path: str):
         if not hasattr(model, 'model_fields'):
@@ -377,7 +371,9 @@ class ConfigWindow(QDialog):
                 widget = AiProvidersWidget(current_value)
                 self.widgets_map[current_path] = widget
                 # 将复杂控件添加到主布局而非表单布局
-                parent_layout.addWidget(SubtitleLabel(field_info.description or field_name))
+                label = QLabel(field_info.description or field_name)
+                label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                parent_layout.addWidget(label)
                 parent_layout.addWidget(widget)
                 continue
 
@@ -396,7 +392,9 @@ class ConfigWindow(QDialog):
                 
                 widget = MultiSelectWithCombineWidget(items=options, config_dict=config_dict)
                 self.widgets_map[current_path] = widget
-                parent_layout.addWidget(SubtitleLabel(field_info.description or field_name))
+                label = QLabel(field_info.description or field_name)
+                label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                parent_layout.addWidget(label)
                 parent_layout.addWidget(widget)
                 continue
 
@@ -406,7 +404,8 @@ class ConfigWindow(QDialog):
                 self._generate_widgets_for_model(group_layout, current_value, current_path)
                 parent_layout.addWidget(group_box)
             else:
-                label = StrongBodyLabel(f"{field_info.description or field_name.replace('_', ' ').title()}:")
+                label = QLabel(f"{field_info.description or field_name.replace('_', ' ').title()}:")
+                label.setFont(QFont("Arial", 9, QFont.Weight.Bold))
                 widget = self._create_widget(current_path, field_info, current_value)
                 if widget:
                     self.widgets_map[current_path] = widget
@@ -441,7 +440,7 @@ class ConfigWindow(QDialog):
             
         # --- 更新：处理ComboBox的映射逻辑 ---
         if json_key in self.search_params_meta and isinstance(self.search_params_meta[json_key], dict):
-            combo = ComboBox()
+            combo = QComboBox()
             options = self.search_params_meta[json_key]
             # 添加 item，将 code 存储在 UserRole 数据中
             for name, code in options.items():
@@ -455,31 +454,31 @@ class ConfigWindow(QDialog):
             return combo
             
         if field_type is bool:
-            widget = CheckBox()
+            widget = QCheckBox()
             widget.setChecked(bool(value))
             return widget
         if field_type is int:
-            widget = SpinBox()
+            widget = QSpinBox()
             widget.setRange(-2147483648, 2147483647)
             widget.setValue(value)
             return widget
         if field_type is float:
-            widget = DoubleSpinBox()
+            widget = QDoubleSpinBox()
             widget.setRange(-1e9, 1e9)
             widget.setValue(value)
             return widget
         if field_type is str:
             # 增加对密码字段的判断
             if 'password' in path or 'api_key' in path:
-                widget = LineEdit()
-                widget.setEchoMode(LineEdit.EchoMode.Password)
+                widget = QLineEdit()
+                widget.setEchoMode(QLineEdit.EchoMode.Password)
             elif 'file' in path or 'path' in path or 'prompt' in path or len(str(value)) > 80 :
-                 widget = TextEdit()
+                 widget = QTextEdit()
                  widget.setPlainText(str(value))
                  widget.setMinimumHeight(150)
                  return widget
             else:
-                widget = LineEdit()
+                widget = QLineEdit()
             widget.setText(str(value))
             return widget
             
@@ -489,10 +488,10 @@ class ConfigWindow(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch(1)
         
-        self.save_button = PushButton(FluentIcon.SAVE, "保存并重载")
+        self.save_button = QPushButton("保存并重载")
         self.save_button.clicked.connect(self.save_config)
         
-        self.cancel_button = PushButton("取消")
+        self.cancel_button = QPushButton("取消")
         self.cancel_button.clicked.connect(self.reject)
         
         button_layout.addWidget(self.save_button)
@@ -514,15 +513,15 @@ class ConfigWindow(QDialog):
                 value = None
 
                 # --- 更新：获取控件值的逻辑 ---
-                if isinstance(widget, ComboBox):
+                if isinstance(widget, QComboBox):
                     # 直接获取当前项关联的 userData (即 code)
                     value = widget.currentData()
                 elif isinstance(widget, (MultiSelectWithCombineWidget, AiProvidersWidget, ListEditWidget)): 
                     value = widget.value()
-                elif isinstance(widget, CheckBox): value = widget.isChecked()
-                elif isinstance(widget, (SpinBox, DoubleSpinBox)): value = widget.value()
-                elif isinstance(widget, TextEdit): value = widget.toPlainText()
-                elif isinstance(widget, LineEdit): value = widget.text()
+                elif isinstance(widget, QCheckBox): value = widget.isChecked()
+                elif isinstance(widget, (QSpinBox, QDoubleSpinBox)): value = widget.value()
+                elif isinstance(widget, QTextEdit): value = widget.toPlainText()
+                elif isinstance(widget, QLineEdit): value = widget.text()
                 
                 if value is not None:
                     data_level[last_key] = value
@@ -541,24 +540,42 @@ class ConfigWindow(QDialog):
             loop = asyncio.get_event_loop()
             asyncio.run_coroutine_threadsafe(event_manager.publish("config_reloaded"), loop)
             
-            InfoBar.success("成功", "配置已成功保存并重载！", duration=3000, position=InfoBarPosition.TOP, parent=self)
+            QMessageBox.information(self, "成功", "配置已成功保存并重载！")
             self.accept()
             
         except Exception as e:
             # 提供更详细的错误信息
-            InfoBar.error("错误", f"保存配置失败: {e}", duration=-1, position=InfoBarPosition.TOP, parent=self)
+            QMessageBox.critical(self, "错误", f"保存配置失败: {e}")
             import traceback
             traceback.print_exc()
 
 
 if __name__ == '__main__':
-    # HiDPI settings
+    # HiDPI settings and input method support (移除已弃用的属性)
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)  # 已弃用
+    # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)     # 已弃用
+    QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
     
     app = QApplication(sys.argv)
-    setTheme(Theme.DARK)
+    
+    # 设置应用程序样式为深色主题
+    app.setStyle('Fusion')
+    palette = app.palette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(0, 0, 0))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
+    palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
+    app.setPalette(palette)
     
     # 创建一个后台线程来运行事件循环
     loop = asyncio.new_event_loop()
@@ -576,8 +593,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"加载初始配置失败: {e}")
         # 在GUI中显示错误
-        error_dialog = Dialog("配置错误", f"加载初始配置失败: {e}")
-        error_dialog.exec()
+        error_dialog = QMessageBox.critical(None, "配置错误", f"加载初始配置失败: {e}")
         sys.exit(1)
             
     window = ConfigWindow()
